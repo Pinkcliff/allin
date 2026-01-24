@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(tree:*)",
+      "Bash(python:*)",
+      "mcp__zai-mcp-server__analyze_image",
+      "Bash(pip install:*)",
+      "Bash(conda activate:*)",
+      "Bash(conda run:*)",
+      "Bash(where:*)",
+      "Bash(\"D:\\\\ProgramData\\\\Anaconda3\\\\envs\\\\my_env\\\\python.exe\":*)",
+      "Bash(mklink:*)"
+    ]
+  }
+}
