@@ -459,7 +459,11 @@ class MainWindow(QMainWindow):
         self.menu_udp_auto_send_action.blockSignals(False)
 
     def _send_pwm_data_via_udp(self, selected_only: bool = False):
-        """通过UDP发送PWM数据"""
+        """通过UDP发送PWM数据
+
+        Args:
+            selected_only: 是否只发送选中的风扇
+        """
         if not self.udp_enabled or self.udp_sender is None:
             # 【修复】减少日志输出，避免刷屏
             # self._add_info_message("[UDP] 发送失败: UDP未启用或发送器未初始化")
@@ -474,9 +478,13 @@ class MainWindow(QMainWindow):
             # 【修复】简化日志
             self.udp_sender.queue_send_selected(grid_data, selected_cells, self._udp_send_callback)
         else:
-            # 【修复】简化日志，不输出发送开始信息
-            # self._add_info_message("[UDP] 发送全部数据: 100个控制板 (40x40风扇)")
-            self.udp_sender.queue_send_grid(grid_data, self._udp_send_callback)
+            # 【修复】统一使用80字节批量包模式
+            if isinstance(self.udp_sender, AsyncFanUDPSender):
+                # 异步模式：使用队列，不传callback（避免跨线程调用）
+                self.udp_sender.queue_send_bulk(grid_data, callback=None)
+            else:
+                # 同步模式：直接发送
+                self.udp_sender.send_grid_to_boards_bulk(grid_data, self._udp_send_callback)
 
     def _udp_send_callback(self, success_count: int, fail_count: int, elapsed_time: float):
         """UDP发送回调函数 - 批量回调"""
@@ -909,7 +917,8 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'is_playing') and self.is_playing:
                 if self.udp_enabled and self.udp_send_on_play:
                     # 【修复】只在实际发送时输出一条简洁日志
-                    # self._add_info_message(f"[播放UDP] t={time_value:.2f}s 开始发送数据到100个控制板")
+                    # self._add_info_message(f"[播放UDP] t={time_value:.2f}s 开始发送80字节批量数据到100个IP")
+                    # 使用80字节批量模式
                     self._send_pwm_data_via_udp(selected_only=False)
 
         # 【修复】减少调试日志输出频率，避免UI卡顿
@@ -928,11 +937,11 @@ class MainWindow(QMainWindow):
         if is_playing:
             self._add_info_message("=== 播放开始 ===")
             if self.udp_enabled and self.udp_send_on_play:
-                self._add_info_message("播放时自动发送UDP数据: 已启用")
+                self._add_info_message("播放时自动发送UDP数据: 已启用（80字节批量模式）")
                 self._add_info_message(f"将每隔 {self.time_resolution}s 发送一次数据")
                 # 【新增】播放开始时立即发送一次当前数据
                 if hasattr(self, 'current_function_params') and self.current_function_params:
-                    self._add_info_message("[播放UDP] 播放开始，立即发送当前帧数据")
+                    self._add_info_message("[播放UDP] 播放开始，立即发送当前帧数据（80字节×100IP）")
                     self._send_pwm_data_via_udp(selected_only=False)
             else:
                 if self.udp_enabled:

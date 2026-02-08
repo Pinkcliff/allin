@@ -11,6 +11,14 @@ import debug
 from ui_motion_capture import CameraSettingsDock
 from ui_sensor_dock import create_sensor_data_dock
 
+# 【新增】导入动捕采集窗口
+import sys
+import os
+# 添加动捕模块路径
+motion_capture_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '动捕')
+if motion_capture_path not in sys.path:
+    sys.path.insert(0, motion_capture_path)
+
 class GlobalDashboardWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -343,18 +351,56 @@ class GlobalDashboardWindow(QMainWindow):
         当相机状态灯被点击时调用，显示对应相机的设置面板
         """
         debug.log_debug(f"请求显示相机ID {camera_id} 的设置面板。")
-        
+
         if camera_id in self.camera_data:
             data = self.camera_data[camera_id]
-            
+
             self.camera_settings_dock.load_camera_data(data)
-            
+
             self.camera_settings_dock.show()
-            
+
             # 需求5: 单个动捕相机dock启动时要位于最前端
             self.camera_settings_dock.raise_()
-            
+
             self.camera_settings_dock.activateWindow()
+
+    def open_motion_capture_window(self):
+        """
+        【新增】打开动捕数据采集窗口
+        """
+        debug.log_debug("打开动捕数据采集窗口")
+
+        try:
+            # 延迟导入，避免启动时加载失败
+            from motion_capture_window import MotionCaptureWindow
+
+            # 如果窗口还不存在，创建它
+            if not hasattr(self, '_motion_capture_window') or self._motion_capture_window is None:
+                self._motion_capture_window = MotionCaptureWindow(self)
+
+            # 显示窗口
+            self._motion_capture_window.show()
+            self._motion_capture_window.raise_()
+            self._motion_capture_window.activateWindow()
+
+            debug.log_debug("动捕数据采集窗口已打开")
+
+        except ImportError as e:
+            debug.log_debug(f"导入动捕采集窗口失败: {e}")
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self,
+                "模块未找到",
+                f"无法导入动捕采集模块：{str(e)}\n请确保动捕文件夹存在。"
+            )
+        except Exception as e:
+            debug.log_debug(f"打开动捕采集窗口时出错: {e}")
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.critical(
+                self,
+                "错误",
+                f"打开动捕采集窗口时出错：{str(e)}"
+            )
 
     def toggle_dynamic_dock(self, dock_name, show):
         """

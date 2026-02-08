@@ -10,7 +10,8 @@
       "Bash(conda run:*)",
       "Bash(where:*)",
       "Bash(\"D:\\\\ProgramData\\\\Anaconda3\\\\envs\\\\my_env\\\\python.exe\":*)",
-      "Bash(mklink:*)"
+      "Bash(mklink:*)",
+      "mcp__zai-mcp-server__extract_text_from_screenshot"
     ]
   }
 }
