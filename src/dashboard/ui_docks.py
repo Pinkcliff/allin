@@ -206,7 +206,7 @@ def create_comm_dock(main_window, is_independent=False):
     power_layout.setSpacing(15)
 
     # 创建三个电力监控图表（缩小版本）
-    from ui_chart_widget import RealTimeChartWidget
+    from .ui_chart_widget import RealTimeChartWidget
 
     # 电流图表
     main_window.chart_current_widget = RealTimeChartWidget("实时电流监控", "电流 (A)", (0, 1000), parent=main_window.canvas)
