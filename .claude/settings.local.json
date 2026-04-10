@@ -31,7 +31,22 @@
       "Bash(\"D:/ProgramData/Anaconda3/envs/my_env/python.exe\" -m py_compile PLC监控/s7_comm/s7_connector.py PLC监控/encoder_monitor.py PLC监控/point_table_monitor.py 仪表盘/debug.py)",
       "Bash(\"D:/ProgramData/Anaconda3/envs/my_env/python.exe\" test_system_imports.py)",
       "Bash(\"D:/ProgramData/Anaconda3/envs/my_env/python.exe\" main.py)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(cp -r \"动捕/\"* ../src/modules/motion_capture/)",
+      "Bash(cp -r \"风场编辑器/\"* ../src/modules/wind_field/editor/)",
+      "Bash(cp -r \"风场设置/\"* ../src/modules/wind_field/settings/)",
+      "Bash(cp -r \"前处理/\"* ../src/modules/wind_field/preprocessing/)",
+      "Bash(cp -r \"测试/\"* ../src/tests/)",
+      "Bash(cp -r tests/* ../src/tests/)",
+      "Bash(cp data/* ../data/)",
+      "Bash(cp docs/* ../docs/)",
+      "Bash(find . -type d -exec touch {}/__init__.py \\\\;)",
+      "Bash(rm -f cleanup_cfd_source.py process_doc.py renumber_tables.py temp_doc_content.txt chat_history.md)",
+      "Bash(mv LuMo_Data_20260124_183913_markers6.csv data/)",
+      "Bash(grep -n \"^from [a-z]\" *.py)",
+      "Bash(cat)",
+      "Read(//d F:/A-User/cliff/**)",
+      "Bash(D:\\\\ProgramData\\\\Anaconda3\\\\Scripts\\\\activate.bat my_env)"
     ]
   }
 }
