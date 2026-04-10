@@ -11,7 +11,27 @@
       "Bash(where:*)",
       "Bash(\"D:\\\\ProgramData\\\\Anaconda3\\\\envs\\\\my_env\\\\python.exe\":*)",
       "Bash(mklink:*)",
-      "mcp__zai-mcp-server__extract_text_from_screenshot"
+      "mcp__zai-mcp-server__extract_text_from_screenshot",
+      "Bash(xargs wc:*)",
+      "Bash(pip:*)",
+      "Bash(cp:*)",
+      "mcp__web-search-prime__web_search_prime",
+      "WebSearch",
+      "Bash(D:\\\\ProgramData\\\\Anaconda3\\\\Scripts\\\\conda.exe run:*)",
+      "Bash(\"D:\\\\ProgramData\\\\Anaconda3\\\\Library\\\\bin\\\\conda.bat\" activate:*)",
+      "Bash(tasklist)",
+      "Bash(findstr python:*)",
+      "Bash(findstr -i pyside)",
+      "Bash(\"D:\\\\ProgramData\\\\Anaconda3\\\\envs\\\\my_env\\\\Scripts\\\\pip.exe\" list:*)",
+      "Bash(\"启动系统.bat\")",
+      "Bash(findstr python.exe)",
+      "Bash(ls \"F:/A-User/cliff/allin/all/\"*.png)",
+      "Bash(D:/ProgramData/Anaconda3/envs/my_env/python.exe:*)",
+      "Bash(\"D:/ProgramData/Anaconda3/envs/my_env/python.exe\" test_plc_full.py)",
+      "Bash(\"D:/ProgramData/Anaconda3/envs/my_env/python.exe\" -m py_compile PLC监控/s7_comm/s7_connector.py PLC监控/encoder_monitor.py PLC监控/point_table_monitor.py 仪表盘/debug.py)",
+      "Bash(\"D:/ProgramData/Anaconda3/envs/my_env/python.exe\" test_system_imports.py)",
+      "Bash(\"D:/ProgramData/Anaconda3/envs/my_env/python.exe\" main.py)",
+      "Bash(git config:*)"
     ]
   }
 }

@@ -1,0 +1,3497 @@
+
+================================================================================
+                            微小型无人机智能风场测试评估系统 - 源代码文档                            
+================================================================================
+
+软件名称：微小型无人机智能风场测试评估系统
+版本号：V2.0.0
+文档类型：源代码文档
+生成日期：2026年01月
+
+================================================================================
+
+================================================================================
+                                    前30页源代码                                     
+================================================================================
+
+
+--------------------------------------------------------------------------------
+文件：main.py
+--------------------------------------------------------------------------------
+[第 1 页]
+
+   1	# -*- coding: utf-8 -*-
+   2	"""
+   3	融合系统主入口 - 整合仪表盘和传感器数据采集系统
+   4	提供菜单或按钮来启动各个子模块
+   5	"""
+   6	import sys
+   7	import os
+   8	from PySide6.QtWidgets import (
+   9	    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+  10	    QPushButton, QLabel, QMessageBox, QStyleFactory
+  11	)
+  12	from PySide6.QtCore import Qt
+  13	from PySide6.QtGui import QFont
+  14	
+  15	# 添加项目根目录到路径
+  16	ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+  17	if ROOT_DIR not in sys.path:
+  18	    sys.path.insert(0, ROOT_DIR)
+  19	
+  20	# 添加仪表盘目录到路径
+  21	dashboard_dir = os.path.join(ROOT_DIR, '仪表盘')
+  22	if dashboard_dir not in sys.path:
+  23	    sys.path.insert(0, dashboard_dir)
+  24	
+  25	
+  26	class LauncherWindow(QMainWindow):
+  27	    """融合系统启动器窗口"""
+  28	
+  29	    def __init__(self):
+  30	        super().__init__()
+  31	        self.dashboard_window = None
+  32	        self.sensor_window = None
+  33	        self.init_ui()
+  34	
+  35	    def init_ui(self):
+  36	        """初始化UI"""
+  37	        self.setWindowTitle("微小型无人机智能风场测试评估系统 - 融合平台")
+  38	        self.setMinimumSize(800, 600)
+  39	
+  40	        # 创建中央部件
+  41	        central_widget = QWidget()
+  42	        self.setCentralWidget(central_widget)
+  43	
+  44	        layout = QVBoxLayout()
+  45	        layout.setSpacing(30)
+  46	        layout.setContentsMargins(50, 50, 50, 50)
+  47	
+  48	        # 标题
+  49	        title = QLabel("微小型无人机智能风场测试评估系统")
+  50	        title.setFont(QFont("Microsoft YaHei", 24, QFont.Weight.Bold))
+
+
+--------------------------------------------------------------------------------
+文件：main.py
+--------------------------------------------------------------------------------
+[第 2 页]
+
+  51	        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+  52	        layout.addWidget(title)
+  53	
+  54	        subtitle = QLabel("融合平台 v1.0")
+  55	        subtitle.setFont(QFont("Microsoft YaHei", 14))
+  56	        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+  57	        subtitle.setStyleSheet("color: #666;")
+  58	        layout.addWidget(subtitle)
+  59	
+  60	        layout.addSpacing(50)
+  61	
+  62	        # 模块选择区域
+  63	        modules_label = QLabel("请选择要启动的模块：")
+  64	        modules_label.setFont(QFont("Microsoft YaHei", 14))
+  65	        layout.addWidget(modules_label)
+  66	
+  67	        # 按钮区域
+  68	        btn_layout = QHBoxLayout()
+  69	        btn_layout.setSpacing(20)
+  70	
+  71	        # 全局仪表盘按钮
+  72	        self.dashboard_btn = QPushButton("全局监控仪表盘")
+  73	        self.dashboard_btn.setFixedSize(200, 100)
+  74	        self.dashboard_btn.setFont(QFont("Microsoft YaHei", 12))
+  75	        self.dashboard_btn.setStyleSheet("""
+  76	            QPushButton {
+  77	                background-color: #2196F3;
+  78	                color: white;
+  79	                border-radius: 10px;
+  80	                padding: 10px;
+  81	            }
+  82	            QPushButton:hover {
+  83	                background-color: #1976D2;
+  84	            }
+  85	        """)
+  86	        self.dashboard_btn.clicked.connect(self.launch_dashboard)
+  87	        btn_layout.addWidget(self.dashboard_btn)
+  88	
+  89	        # 融合系统按钮（仪表盘+传感器数据）
+  90	        self.fusion_btn = QPushButton("融合系统\n(仪表盘+传感器)")
+  91	        self.fusion_btn.setFixedSize(200, 100)
+  92	        self.fusion_btn.setFont(QFont("Microsoft YaHei", 12))
+  93	        self.fusion_btn.setStyleSheet("""
+  94	            QPushButton {
+  95	                background-color: #4CAF50;
+  96	                color: white;
+  97	                border-radius: 10px;
+  98	                padding: 10px;
+  99	            }
+ 100	            QPushButton:hover {
+
+
+--------------------------------------------------------------------------------
+文件：main.py
+--------------------------------------------------------------------------------
+[第 3 页]
+
+ 101	                background-color: #45a049;
+ 102	            }
+ 103	        """)
+ 104	        self.fusion_btn.clicked.connect(self.launch_fusion)
+ 105	        btn_layout.addWidget(self.fusion_btn)
+ 106	
+ 107	        # 传感器数据采集按钮
+ 108	        self.sensor_btn = QPushButton("传感器数据采集")
+ 109	        self.sensor_btn.setFixedSize(200, 100)
+ 110	        self.sensor_btn.setFont(QFont("Microsoft YaHei", 12))
+ 111	        self.sensor_btn.setStyleSheet("""
+ 112	            QPushButton {
+ 113	                background-color: #FF9800;
+ 114	                color: white;
+ 115	                border-radius: 10px;
+ 116	                padding: 10px;
+ 117	            }
+ 118	            QPushButton:hover {
+ 119	                background-color: #F57C00;
+ 120	            }
+ 121	        """)
+ 122	        self.sensor_btn.clicked.connect(self.launch_sensor)
+ 123	        btn_layout.addWidget(self.sensor_btn)
+ 124	
+ 125	        btn_layout.addStretch()
+ 126	        layout.addLayout(btn_layout)
+ 127	
+ 128	        layout.addSpacing(30)
+ 129	
+ 130	        # 功能说明区域
+ 131	        info_label = QLabel("功能说明：")
+ 132	        info_label.setFont(QFont("Microsoft YaHei", 12, QFont.Weight.Bold))
+ 133	        layout.addWidget(info_label)
+ 134	
+ 135	        info_text = QLabel(
+ 136	            "• 全局监控仪表盘：包含系统监控、通讯、环境、日志、动捕、风机等所有功能模块\n"
+ 137	            "• 融合系统：集成全局仪表盘 + 传感器数据采集和查看功能\n"
+ 138	            "• 传感器数据采集：独立的传感器数据采集、查看和MongoDB同步功能"
+ 139	        )
+ 140	        info_text.setFont(QFont("Microsoft YaHei", 10))
+ 141	        info_text.setStyleSheet("color: #555; padding-left: 20px;")
+ 142	        info_text.setWordWrap(True)
+ 143	        layout.addWidget(info_text)
+ 144	
+ 145	        layout.addStretch()
+ 146	
+ 147	        # 底部信息
+ 148	        footer = QLabel("© 2026 微小型无人机智能风场测试评估系统 | 融合平台")
+ 149	        footer.setFont(QFont("Microsoft YaHei", 9))
+ 150	        footer.setStyleSheet("color: #999;")
+
+
+--------------------------------------------------------------------------------
+文件：main.py
+--------------------------------------------------------------------------------
+[第 4 页]
+
+ 151	        footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+ 152	        layout.addWidget(footer)
+ 153	
+ 154	        central_widget.setLayout(layout)
+ 155	
+ 156	    def launch_dashboard(self):
+ 157	        """启动全局监控仪表盘"""
+ 158	        try:
+ 159	            from ui_main_window import GlobalDashboardWindow
+ 160	
+ 161	            self.dashboard_window = GlobalDashboardWindow()
+ 162	            self.dashboard_window.show()
+ 163	
+ 164	            self.hide()  # 隐藏启动器
+ 165	
+ 166	        except Exception as e:
+ 167	            QMessageBox.critical(self, "错误", f"启动仪表盘失败：\n{str(e)}")
+ 168	
+ 169	    def launch_fusion(self):
+ 170	        """启动融合系统（仪表盘 + 传感器数据）"""
+ 171	        try:
+ 172	            from ui_main_window import GlobalDashboardWindow
+ 173	
+ 174	            # 创建仪表盘窗口
+ 175	            self.dashboard_window = GlobalDashboardWindow()
+ 176	            self.dashboard_window.show()
+ 177	
+ 178	            # 自动显示传感器数据dock
+ 179	            if hasattr(self.dashboard_window, 'docks') and '传感器数据' in self.dashboard_window.docks:
+ 180	                self.dashboard_window.docks['传感器数据'].show()
+ 181	                # 将传感器数据dock移动到合适的位置
+ 182	                self.dashboard_window.docks['传感器数据'].move(400, 350)
+ 183	                self.dashboard_window.docks['传感器数据'].raise_()
+ 184	
+ 185	            self.hide()  # 隐藏启动器
+ 186	
+ 187	        except Exception as e:
+ 188	            QMessageBox.critical(self, "错误", f"启动融合系统失败：\n{str(e)}")
+ 189	
+ 190	    def launch_sensor(self):
+ 191	        """启动传感器数据采集系统"""
+ 192	        try:
+ 193	            # 检查是否要启动独立的传感器采集窗口还是使用仪表盘中的传感器数据模块
+ 194	            reply = QMessageBox.question(
+ 195	                self, "选择启动方式",
+ 196	                "请选择传感器数据采集系统的启动方式：\n\n"
+ 197	                "• Yes: 在仪表盘中启动（推荐）\n"
+ 198	                "• No: 启动独立的传感器采集窗口",
+ 199	                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+ 200	            )
+
+
+--------------------------------------------------------------------------------
+文件：main.py
+--------------------------------------------------------------------------------
+[第 5 页]
+
+ 201	
+ 202	            if reply == QMessageBox.StandardButton.Yes:
+ 203	                # 在仪表盘中启动
+ 204	                self.launch_fusion()
+ 205	            else:
+ 206	                # 启动独立的传感器采集窗口（这里我们仍然使用仪表盘，但只显示传感器数据dock）
+ 207	                from ui_main_window import GlobalDashboardWindow
+ 208	
+ 209	                self.sensor_window = GlobalDashboardWindow()
+ 210	                self.sensor_window.show()
+ 211	
+ 212	                # 隐藏所有dock，只显示传感器数据
+ 213	                if hasattr(self.sensor_window, 'docks'):
+ 214	                    for name, dock in self.sensor_window.docks.items():
+ 215	                        if name != '传感器数据':
+ 216	                            dock.hide()
+ 217	                        else:
+ 218	                            dock.show()
+ 219	                            dock.move(100, 100)
+ 220	                            dock.resize(800, 600)
+ 221	
+ 222	                self.hide()
+ 223	
+ 224	        except Exception as e:
+ 225	            QMessageBox.critical(self, "错误", f"启动传感器数据采集失败：\n{str(e)}")
+ 226	
+ 227	
+ 228	def main():
+ 229	    """主函数"""
+ 230	    # 设置应用程序样式
+ 231	    app = QApplication(sys.argv)
+ 232	    app.setStyle(QStyleFactory.create('Fusion'))
+ 233	    app.setApplicationName("微小型无人机智能风场测试评估系统")
+ 234	
+ 235	    # 设置中文字体
+ 236	    font = QFont("Microsoft YaHei", 9)
+ 237	    app.setFont(font)
+ 238	
+ 239	    # 创建并显示启动器窗口
+ 240	    launcher = LauncherWindow()
+ 241	    launcher.show()
+ 242	
+ 243	    return app.exec()
+ 244	
+ 245	
+ 246	if __name__ == "__main__":
+ 247	    sys.exit(main())
+ 248	
+
+--------------------------------------------------------------------------------
+文件：config.py
+--------------------------------------------------------------------------------
+[第 5 页]
+
+   1	# -*- coding: utf-8 -*-
+   2	"""
+
+
+--------------------------------------------------------------------------------
+文件：config.py
+--------------------------------------------------------------------------------
+[第 6 页]
+
+   3	融合系统配置文件
+   4	整合 frist 和 setest 两个程序的配置
+   5	"""
+   6	import os
+   7	
+   8	# ==================== 系统配置 ====================
+   9	SYSTEM_CONFIG = {
+  10	    'app_name': '微小型无人机智能风场测试评估系统 - 融合版',
+  11	    'version': '2.0.0',
+  12	    'company': '风洞实验室',
+  13	    'author': '融合开发团队'
+  14	}
+  15	
+  16	# ==================== Redis 配置 (来自 setest) ====================
+  17	REDIS_CONFIG = {
+  18	    'host': 'localhost',
+  19	    'port': 6379,
+  20	    'db': 0,
+  21	    'decode_responses': True
+  22	}
+  23	
+  24	# ==================== MongoDB 配置 (来自 setest) ====================
+  25	MONGO_CONFIG = {
+  26	    'uri': 'mongodb://localhost:27017/',
+  27	    'db_name': 'sensor_data',
+  28	    'collections': 'collections',
+  29	    'samples': 'samples'
+  30	}
+  31	
+  32	# ==================== 传感器配置 (来自 setest) ====================
+  33	SENSOR_CONFIG = {
+  34	    'fans': {
+  35	        'count': 1600,
+  36	        'range': (0, 1000),
+  37	        'name': '风扇PWM',
+  38	        'unit': '',
+  39	        'rows': 40,
+  40	        'cols': 40
+  41	    },
+  42	    'temp_sensors': {
+  43	        'count': 100,
+  44	        'range': (-20, 80),
+  45	        'name': '温度传感器',
+  46	        'unit': '℃',
+  47	        'rows': 10,
+  48	        'cols': 10
+  49	    },
+  50	    'wind_speed_sensors': {
+  51	        'count': 100,
+  52	        'range': (0, 30),
+
+
+--------------------------------------------------------------------------------
+文件：config.py
+--------------------------------------------------------------------------------
+[第 7 页]
+
+  53	        'name': '风速传感器',
+  54	        'unit': 'm/s',
+  55	        'rows': 10,
+  56	        'cols': 10
+  57	    },
+  58	    'temp_humidity_sensors': {
+  59	        'count': 4,
+  60	        'temp_range': (-20, 80),
+  61	        'humidity_range': (0, 100),
+  62	        'name': '温湿度传感器',
+  63	        'temp_unit': '℃',
+  64	        'humidity_unit': '%'
+  65	    },
+  66	    'pressure_sensor': {
+  67	        'temp_range': (-20, 80),
+  68	        'pressure_range': (0, 100),
+  69	        'name': '大气压力传感器',
+  70	        'temp_unit': '℃',
+  71	        'pressure_unit': 'KPa'
+  72	    }
+  73	}
+  74	
+  75	# ==================== 采集配置 (来自 setest) ====================
+  76	SAMPLE_RATE = 10  # 每秒采集次数
+  77	
+  78	# ==================== 通信协议配置 (来自 frist) ====================
+  79	COMM_PROTOCOLS = {
+  80	    "主控制器": "TCP/IP",
+  81	    "电驱": "EtherCAT",
+  82	    "风速传感": "EtherCAT",
+  83	    "温度传感": "EtherCAT",
+  84	    "湿度传感": "EtherCAT",
+  85	    "动捕": "API",
+  86	    "俯仰伺服": "Modbus",
+  87	    "造雨": "Modbus",
+  88	    "喷雾": "Modbus",
+  89	    "训练": "API",
+  90	    "仿真": "API",
+  91	    "电力": "Modbus"
+  92	}
+  93	
+  94	# ==================== 风扇配置 (来自 frist) ====================
+  95	FAN_CONFIG = {
+  96	    'array_rows': 40,
+  97	    'array_cols': 40,
+  98	    'total_fans': 1600,
+  99	    'max_pwm': 1000,
+ 100	    'min_pwm': 0,
+ 101	    'default_pwm': 0,
+ 102	    'fan_id_format': 'X{:03d}Y{:03d}'  # X000Y000 格式
+
+
+--------------------------------------------------------------------------------
+文件：config.py
+--------------------------------------------------------------------------------
+[第 8 页]
+
+ 103	}
+ 104	
+ 105	# ==================== CFD 配置 (来自 frist) ====================
+ 106	CFD_CONFIG = {
+ 107	    'margin': {
+ 108	        'x_min': 0.5,
+ 109	        'x_max': 1.0,
+ 110	        'y_min': 0.5,
+ 111	        'y_max': 1.0,
+ 112	        'z_min': 0.5,
+ 113	        'z_max': 1.0
+ 114	    },
+ 115	    'inlet_length': 1.0,
+ 116	    'outlet_length': 2.0,
+ 117	    'grid_resolution': 0.05
+ 118	}
+ 119	
+ 120	# ==================== 路径配置 ====================
+ 121	# 获取项目根目录
+ 122	ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+ 123	
+ 124	# 模块路径
+ 125	DASHBOARD_DIR = os.path.join(ROOT_DIR, '仪表盘')
+ 126	WIND_CONFIG_DIR = os.path.join(ROOT_DIR, '风场设置')
+ 127	PRE_PROCESSOR_DIR = os.path.join(ROOT_DIR, '前处理')
+ 128	HARDWARE_DIR = os.path.join(ROOT_DIR, '硬件控制')
+ 129	WIND_EDITOR_DIR = os.path.join(ROOT_DIR, '风场编辑器')
+ 130	CORE_DIR = os.path.join(ROOT_DIR, '核心模块')
+ 131	RESOURCE_DIR = os.path.join(ROOT_DIR, '资源')
+ 132	
+ 133	# 资源文件路径
+ 134	BACKGROUND_IMAGE = os.path.join(RESOURCE_DIR, '背景.png')
+ 135	MOTION_IMAGE = os.path.join(RESOURCE_DIR, '动捕.png')
+ 136	WIND_IMAGE = os.path.join(RESOURCE_DIR, '风场.png')
+ 137	
+ 138	# ==================== UI 配置 ====================
+ 139	UI_CONFIG = {
+ 140	    'window_width': 1400,
+ 141	    'window_height': 900,
+ 142	    'theme': 'dark',  # dark 或 light
+ 143	    'animation_enabled': True,
+ 144	    'dock_tab_position': 'North'
+ 145	}
+ 146	
+ 147	# ==================== 日志配置 ====================
+ 148	LOG_CONFIG = {
+ 149	    'level': 'INFO',
+ 150	    'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+ 151	    'file': os.path.join(ROOT_DIR, 'system.log'),
+ 152	    'max_size': 10 * 1024 * 1024,  # 10MB
+
+
+--------------------------------------------------------------------------------
+文件：config.py
+--------------------------------------------------------------------------------
+[第 9 页]
+
+ 153	    'backup_count': 5
+ 154	}
+ 155	
+ 156	# ==================== 硬件控制配置 (来自 frist) ====================
+ 157	HARDWARE_CONFIG = {
+ 158	    'modbus': {
+ 159	        'host': '192.168.1.100',
+ 160	        'port': 502,
+ 161	        'slave_id': 1
+ 162	    },
+ 163	    'ethercat': {
+ 164	        'ifname': 'eth0',
+ 165	        'cycle_time': 1000  # 微秒
+ 166	    }
+ 167	}
+ 168	
+ 169	# ==================== 数据可视化配置 ====================
+ 170	VISUALIZATION_CONFIG = {
+ 171	    'color_map': {
+ 172	        'fan': 'RdYlGn',      # 红-黄-绿 渐变
+ 173	        'temp': 'coolwarm',   # 冷-暖 渐变
+ 174	        'wind': 'viridis'     # 紫-黄 渐变
+ 175	    },
+ 176	    'update_interval': 100,  # 毫秒
+ 177	    'max_data_points': 1000  # 图表最大数据点数
+ 178	}
+ 179	
+ 180	# ==================== 仿真配置 ====================
+ 181	SIMULATION_CONFIG = {
+ 182	    'enabled': True,
+ 183	    'data_interval': 100,  # 毫秒
+ 184	    'random_variation': 0.1  # 10% 随机变化
+ 185	}
+ 186	
+ 187	# ==================== 调试配置 ====================
+ 188	DEBUG_CONFIG = {
+ 189	    'enabled': False,
+ 190	    'log_to_file': True,
+ 191	    'verbose': False
+ 192	}
+ 193	
+ 194	# ==================== 导出配置字典 ====================
+ 195	ALL_CONFIGS = {
+ 196	    'system': SYSTEM_CONFIG,
+ 197	    'redis': REDIS_CONFIG,
+ 198	    'mongo': MONGO_CONFIG,
+ 199	    'sensors': SENSOR_CONFIG,
+ 200	    'sample_rate': SAMPLE_RATE,
+ 201	    'comm_protocols': COMM_PROTOCOLS,
+ 202	    'fan': FAN_CONFIG,
+
+
+--------------------------------------------------------------------------------
+文件：config.py
+--------------------------------------------------------------------------------
+[第 10 页]
+
+ 203	    'cfd': CFD_CONFIG,
+ 204	    'ui': UI_CONFIG,
+ 205	    'log': LOG_CONFIG,
+ 206	    'hardware': HARDWARE_CONFIG,
+ 207	    'visualization': VISUALIZATION_CONFIG,
+ 208	    'simulation': SIMULATION_CONFIG,
+ 209	    'debug': DEBUG_CONFIG
+ 210	}
+ 211	
+ 212	
+ 213	def get_config(config_name: str):
+ 214	    """
+ 215	    获取指定配置
+ 216	
+ 217	    Args:
+ 218	        config_name: 配置名称
+ 219	
+ 220	    Returns:
+ 221	        配置字典
+ 222	    """
+ 223	    return ALL_CONFIGS.get(config_name, {})
+ 224	
+ 225	
+ 226	def print_all_configs():
+ 227	    """打印所有配置（用于调试）"""
+ 228	    import pprint
+ 229	    pp = pprint.PrettyPrinter(indent=2)
+ 230	    pp.pprint(ALL_CONFIGS)
+ 231	
+ 232	
+ 233	if __name__ == '__main__':
+ 234	    print_all_configs()
+ 235	
+
+--------------------------------------------------------------------------------
+文件：核心模块\数据采集\data_generator.py
+--------------------------------------------------------------------------------
+[第 10 页]
+
+   1	"""
+   2	模拟传感器数据生成器 - 完全随机生成
+   3	"""
+   4	import random
+   5	import time
+   6	import sys
+   7	import os
+   8	
+   9	# 添加项目根目录到路径
+  10	PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+  11	if PROJECT_ROOT not in sys.path:
+  12	    sys.path.insert(0, PROJECT_ROOT)
+  13	
+  14	import config
+  15	
+  16	
+  17	class SensorDataGenerator:
+
+
+--------------------------------------------------------------------------------
+文件：核心模块\数据采集\data_generator.py
+--------------------------------------------------------------------------------
+[第 11 页]
+
+  18	    """传感器数据生成器类 - 每次采样完全随机"""
+  19	
+  20	    def __init__(self):
+  21	        """初始化数据生成器"""
+  22	        self.cfg = config.SENSOR_CONFIG
+  23	
+  24	    def _clamp(self, value: float, min_val: float, max_val: float) -> float:
+  25	        """限制数值范围"""
+  26	        return max(min_val, min(max_val, value))
+  27	
+  28	    def generate_fans(self) -> list:
+  29	        """生成1600个风扇PWM值 (0-1000) - 完全随机"""
+  30	        return [random.randint(0, 1000) for _ in range(self.cfg['fans']['count'])]
+  31	
+  32	    def generate_temp_sensors(self) -> list:
+  33	        """生成100个温度传感器值 (-20~80℃) - 完全随机"""
+  34	        return [
+  35	            round(random.uniform(-20, 80), 1)
+  36	            for _ in range(self.cfg['temp_sensors']['count'])
+  37	        ]
+  38	
+  39	    def generate_wind_speed_sensors(self) -> list:
+  40	        """生成100个风速传感器值 (0~30m/s) - 完全随机"""
+  41	        return [
+  42	            round(random.uniform(0, 30), 1)
+  43	            for _ in range(self.cfg['wind_speed_sensors']['count'])
+  44	        ]
+  45	
+  46	    def generate_temp_humidity_sensors(self) -> list:
+  47	        """生成4个温湿度传感器值 - 完全随机"""
+  48	        result = []
+  49	        for _ in range(self.cfg['temp_humidity_sensors']['count']):
+  50	            result.append({
+  51	                'temperature': round(random.uniform(-20, 80), 1),
+  52	                'humidity': round(random.uniform(0, 100), 1)
+  53	            })
+  54	        return result
+  55	
+  56	    def generate_pressure_sensor(self) -> dict:
+  57	        """生成大气压力传感器值 - 完全随机"""
+  58	        return {
+  59	            'temperature': round(random.uniform(-20, 80), 1),
+  60	            'pressure': round(random.uniform(0, 100), 2)
+  61	        }
+  62	
+  63	    def generate_sample(self) -> dict:
+  64	        """
+  65	        生成一次完整的采样数据 - 完全随机
+  66	
+  67	        Returns:
+
+
+--------------------------------------------------------------------------------
+文件：核心模块\数据采集\data_generator.py
+--------------------------------------------------------------------------------
+[第 12 页]
+
+  68	            包含所有传感器数据的字典
+  69	        """
+  70	        return {
+  71	            'timestamp': time.time(),
+  72	            'fans': self.generate_fans(),
+  73	            'temp_sensors': self.generate_temp_sensors(),
+  74	            'wind_speed_sensors': self.generate_wind_speed_sensors(),
+  75	            'temp_humidity_sensors': self.generate_temp_humidity_sensors(),
+  76	            'pressure_sensor': self.generate_pressure_sensor()
+  77	        }
+  78	
+
+--------------------------------------------------------------------------------
+文件：核心模块\数据存储\redis_database.py
+--------------------------------------------------------------------------------
+[第 12 页]
+
+   1	# -*- coding: utf-8 -*-
+   2	"""
+   3	Redis数据库交互模块
+   4	来自 setest 程序
+   5	"""
+   6	import redis
+   7	import json
+   8	import time
+   9	import sys
+  10	import os
+  11	from typing import Dict, List, Optional, Any
+  12	from datetime import datetime
+  13	
+  14	# 添加项目根目录到路径
+  15	ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+  16	if ROOT_DIR not in sys.path:
+  17	    sys.path.insert(0, ROOT_DIR)
+  18	
+  19	import config
+  20	
+  21	
+  22	class RedisDatabase:
+  23	    """Redis数据库操作类"""
+  24	
+  25	    def __init__(self):
+  26	        """初始化Redis连接"""
+  27	        self.redis_client = redis.Redis(**config.REDIS_CONFIG)
+  28	        self._test_connection()
+  29	
+  30	    def _test_connection(self):
+  31	        """测试Redis连接"""
+  32	        try:
+  33	            self.redis_client.ping()
+  34	            print("[OK] Redis连接成功")
+  35	        except redis.ConnectionError:
+  36	            print("[ERROR] Redis连接失败，请确保Redis服务已启动")
+  37	            raise
+  38	
+  39	    def create_collection(self, name: str) -> str:
+
+
+--------------------------------------------------------------------------------
+文件：核心模块\数据存储\redis_database.py
+--------------------------------------------------------------------------------
+[第 13 页]
+
+  40	        """
+  41	        创建新的数据采集
+  42	
+  43	        Args:
+  44	            name: 采集名称
+  45	
+  46	        Returns:
+  47	            collection_id: 采集ID
+  48	        """
+  49	        collection_id = f"collection_{int(time.time() * 1000)}"
+  50	        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+  51	
+  52	        # 存储元数据
+  53	        meta_key = f"collection:meta:{collection_id}"
+  54	        self.redis_client.hset(meta_key, 'id', collection_id)
+  55	        self.redis_client.hset(meta_key, 'name', name)
+  56	        self.redis_client.hset(meta_key, 'created_at', timestamp)
+  57	        self.redis_client.hset(meta_key, 'status', 'collecting')
+  58	
+  59	        # 添加到采集列表
+  60	        self.redis_client.sadd("collections:list", collection_id)
+  61	
+  62	        return collection_id
+  63	
+  64	    def save_sample_data(self, collection_id: str, data: Dict[str, Any]) -> bool:
+  65	        """
+  66	        保存单次采样数据
+  67	
+  68	        Args:
+  69	            collection_id: 采集ID
+  70	            data: 采样数据字典
+  71	
+  72	        Returns:
+  73	            是否保存成功
+  74	        """
+  75	        try:
+  76	            timestamp = data['timestamp']
+  77	            ts_key = f"collection:{collection_id}:timestamps"
+  78	
+  79	            # 添加时间戳到有序集合
+  80	            self.redis_client.zadd(ts_key, {str(timestamp): timestamp})
+  81	
+  82	            # 存储数据
+  83	            data_key = f"collection:{collection_id}:data:{timestamp}"
+  84	            self.redis_client.hset(data_key, 'fans', json.dumps(data['fans']))
+  85	            self.redis_client.hset(data_key, 'temp_sensors', json.dumps(data['temp_sensors']))
+  86	            self.redis_client.hset(data_key, 'wind_speed_sensors', json.dumps(data['wind_speed_sensors']))
+  87	            self.redis_client.hset(data_key, 'temp_humidity_sensors', json.dumps(data['temp_humidity_sensors']))
+  88	            self.redis_client.hset(data_key, 'pressure_sensor', json.dumps(data['pressure_sensor']))
+  89	
+
+
+--------------------------------------------------------------------------------
+文件：核心模块\数据存储\redis_database.py
+--------------------------------------------------------------------------------
+[第 14 页]
+
+  90	            return True
+  91	        except Exception as e:
+  92	            print(f"保存数据失败: {e}")
+  93	            return False
+  94	
+  95	    def finish_collection(self, collection_id: str):
+  96	        """
+  97	        标记采集完成
+  98	
+  99	        Args:
+ 100	            collection_id: 采集ID
+ 101	        """
+ 102	        self.redis_client.hset(
+ 103	            f"collection:meta:{collection_id}",
+ 104	            'status',
+ 105	            'completed'
+ 106	        )
+ 107	
+ 108	    def get_collections_list(self) -> List[Dict[str, str]]:
+ 109	        """
+ 110	        获取所有采集列表
+ 111	
+ 112	        Returns:
+ 113	            采集信息列表
+ 114	        """
+ 115	        collection_ids = self.redis_client.smembers("collections:list")
+ 116	        collections = []
+ 117	
+ 118	        for cid in collection_ids:
+ 119	            meta = self.redis_client.hgetall(f"collection:meta:{cid}")
+ 120	            if meta:
+ 121	                # 获取数据点数量
+ 122	                count = self.redis_client.zcard(f"collection:{cid}:timestamps")
+ 123	                meta['sample_count'] = str(count)
+ 124	                collections.append(meta)
+ 125	
+ 126	        return sorted(collections, key=lambda x: x['created_at'], reverse=True)
+ 127	
+ 128	    def get_collection_data(self, collection_id: str, start: int = 0, end: int = -1) -> List[Dict]:
+ 129	        """
+ 130	        获取指定采集的数据
+ 131	
+ 132	        Args:
+ 133	            collection_id: 采集ID
+ 134	            start: 起始索引
+ 135	            end: 结束索引（-1表示到最后）
+ 136	
+ 137	        Returns:
+ 138	            数据列表
+ 139	        """
+
+
+--------------------------------------------------------------------------------
+文件：核心模块\数据存储\redis_database.py
+--------------------------------------------------------------------------------
+[第 15 页]
+
+ 140	        ts_key = f"collection:{collection_id}:timestamps"
+ 141	
+ 142	        # 获取时间戳列表（支持分页）
+ 143	        if end == -1:
+ 144	            timestamps = self.redis_client.zrange(ts_key, start, -1)
+ 145	        else:
+ 146	            timestamps = self.redis_client.zrange(ts_key, start, end)
+ 147	
+ 148	        data_list = []
+ 149	        for ts in timestamps:
+ 150	            ts_float = float(ts)
+ 151	            data_key = f"collection:{collection_id}:data:{ts_float}"
+ 152	            data = self.redis_client.hgetall(data_key)
+ 153	
+ 154	            if data:
+ 155	                data_list.append({
+ 156	                    'timestamp': ts_float,
+ 157	                    'fans': json.loads(data['fans']),
+ 158	                    'temp_sensors': json.loads(data['temp_sensors']),
+ 159	                    'wind_speed_sensors': json.loads(data['wind_speed_sensors']),
+ 160	                    'temp_humidity_sensors': json.loads(data['temp_humidity_sensors']),
+ 161	                    'pressure_sensor': json.loads(data['pressure_sensor'])
+ 162	                })
+ 163	
+ 164	        return data_list
+ 165	
+ 166	    def get_collection_meta(self, collection_id: str) -> Optional[Dict[str, str]]:
+ 167	        """
+ 168	        获取采集元数据
+ 169	
+ 170	        Args:
+ 171	            collection_id: 采集ID
+ 172	
+ 173	        Returns:
+ 174	            元数据字典
+ 175	        """
+ 176	        return self.redis_client.hgetall(f"collection:meta:{collection_id}")
+ 177	
+ 178	    def delete_collection(self, collection_id: str) -> bool:
+ 179	        """
+ 180	        删除指定采集
+ 181	
+ 182	        Args:
+ 183	            collection_id: 采集ID
+ 184	
+ 185	        Returns:
+ 186	            是否删除成功
+ 187	        """
+ 188	        try:
+ 189	            # 获取所有时间戳
+
+
+--------------------------------------------------------------------------------
+文件：核心模块\数据存储\redis_database.py
+--------------------------------------------------------------------------------
+[第 16 页]
+
+ 190	            ts_key = f"collection:{collection_id}:timestamps"
+ 191	            timestamps = self.redis_client.zrange(ts_key, 0, -1)
+ 192	
+ 193	            # 删除所有数据
+ 194	            for ts in timestamps:
+ 195	                ts_float = float(ts)
+ 196	                data_key = f"collection:{collection_id}:data:{ts_float}"
+ 197	                self.redis_client.delete(data_key)
+ 198	
+ 199	            # 删除时间戳集合和元数据
+ 200	            self.redis_client.delete(ts_key)
+ 201	            self.redis_client.delete(f"collection:meta:{collection_id}")
+ 202	            self.redis_client.srem("collections:list", collection_id)
+ 203	
+ 204	            return True
+ 205	        except Exception as e:
+ 206	            print(f"删除失败: {e}")
+ 207	            return False
+ 208	
+ 209	    def get_sample_count(self, collection_id: str) -> int:
+ 210	        """获取采集的数据点数量"""
+ 211	        return self.redis_client.zcard(f"collection:{collection_id}:timestamps")
+ 212	
+ 213	    def save_realtime_data(self, data: Dict[str, Any]) -> bool:
+ 214	        """
+ 215	        保存实时数据（用于仪表盘显示）
+ 216	
+ 217	        Args:
+ 218	            data: 实时数据字典
+ 219	
+ 220	        Returns:
+ 221	            是否保存成功
+ 222	        """
+ 223	        try:
+ 224	            self.redis_client.set("realtime:data", json.dumps(data), ex=5)
+ 225	            return True
+ 226	        except Exception as e:
+ 227	            print(f"保存实时数据失败: {e}")
+ 228	            return False
+ 229	
+ 230	    def get_realtime_data(self) -> Optional[Dict[str, Any]]:
+ 231	        """
+ 232	        获取实时数据
+ 233	
+ 234	        Returns:
+ 235	            实时数据字典
+ 236	        """
+ 237	        try:
+ 238	            data = self.redis_client.get("realtime:data")
+ 239	            if data:
+
+
+--------------------------------------------------------------------------------
+文件：核心模块\数据存储\redis_database.py
+--------------------------------------------------------------------------------
+[第 17 页]
+
+ 240	                return json.loads(data)
+ 241	            return None
+ 242	        except Exception as e:
+ 243	            print(f"获取实时数据失败: {e}")
+ 244	            return None
+ 245	
+
+--------------------------------------------------------------------------------
+文件：核心模块\数据同步\sync_to_mongo.py
+--------------------------------------------------------------------------------
+[第 17 页]
+
+   1	"""
+   2	Redis 到 MongoDB 数据同步程序
+   3	"""
+   4	import sys
+   5	import json
+   6	import time
+   7	import os
+   8	from datetime import datetime
+   9	from typing import List, Dict, Any
+  10	from pymongo import MongoClient, UpdateOne
+  11	from tqdm import tqdm
+  12	
+  13	# 添加项目根目录到路径
+  14	PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+  15	if PROJECT_ROOT not in sys.path:
+  16	    sys.path.insert(0, PROJECT_ROOT)
+  17	
+  18	# 添加数据存储模块路径
+  19	STORAGE_DIR = os.path.join(PROJECT_ROOT, '核心模块', '数据存储')
+  20	if STORAGE_DIR not in sys.path:
+  21	    sys.path.insert(0, STORAGE_DIR)
+  22	
+  23	import config
+  24	from 核心模块.数据存储 import RedisDatabase
+  25	
+  26	
+  27	class MongoSync:
+  28	    """MongoDB 同步类"""
+  29	
+  30	    def __init__(self, mongo_uri: str = "mongodb://localhost:27017/", db_name: str = "sensor_data"):
+  31	        """
+  32	        初始化 MongoDB 连接
+  33	
+  34	        Args:
+  35	            mongo_uri: MongoDB 连接字符串
+  36	            db_name: 数据库名称
+  37	        """
+  38	        try:
+  39	            self.client = MongoClient(mongo_uri)
+  40	            self.db = self.client[db_name]
+  41	
+  42	            # 测试连接
+  43	            self.client.admin.command('ping')
+  44	            print(f"[OK] MongoDB 连接成功 (数据库: {db_name})")
+
+
+--------------------------------------------------------------------------------
+文件：核心模块\数据同步\sync_to_mongo.py
+--------------------------------------------------------------------------------
+[第 18 页]
+
+  45	        except Exception as e:
+  46	            print(f"[ERROR] MongoDB 连接失败: {e}")
+  47	            print("请确保 MongoDB 服务已启动")
+  48	            raise
+  49	
+  50	        # 集合名称
+  51	        self.collections_col = self.db["collections"]
+  52	        self.samples_col = self.db["samples"]
+  53	
+  54	        # 创建索引
+  55	        self._create_indexes()
+  56	
+  57	        self.redis_db = RedisDatabase()
+  58	
+  59	    def _create_indexes(self):
+  60	        """创建索引以提高查询性能"""
+  61	        print("[INFO] 创建索引...")
+  62	
+  63	        # collections 集合索引
+  64	        self.collections_col.create_index("collection_id", unique=True)
+  65	        self.collections_col.create_index("created_at")
+  66	        self.collections_col.create_index("status")
+  67	
+  68	        # samples 集合索引
+  69	        self.samples_col.create_index([("collection_id", 1), ("timestamp", 1)], unique=True)
+  70	        self.samples_col.create_index("collection_id")
+  71	        self.samples_col.create_index("timestamp")
+  72	
+  73	        print("[OK] 索引创建完成")
+  74	
+  75	    def sync_collection_meta(self, collection_id: str) -> bool:
+  76	        """
+  77	        同步单个采集的元数据
+  78	
+  79	        Args:
+  80	            collection_id: 采集ID
+  81	
+  82	        Returns:
+  83	            是否同步成功
+  84	        """
+  85	        try:
+  86	            meta = self.redis_db.get_collection_meta(collection_id)
+  87	            if not meta:
+  88	                return False
+  89	
+  90	            # 获取样本数量
+  91	            sample_count = self.redis_db.get_sample_count(collection_id)
+  92	
+  93	            # 构建 MongoDB 文档
+  94	            doc = {
+
+
+--------------------------------------------------------------------------------
+文件：核心模块\数据同步\sync_to_mongo.py
+--------------------------------------------------------------------------------
+[第 19 页]
+
+  95	                "collection_id": collection_id,
+  96	                "name": meta.get('name', ''),
+  97	                "created_at": meta.get('created_at', ''),
+  98	                "status": meta.get('status', ''),
+  99	                "sample_count": sample_count,
+ 100	                "synced_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+ 101	            }
+ 102	
+ 103	            # 使用 upsert 更新或插入
+ 104	            self.collections_col.update_one(
+ 105	                {"collection_id": collection_id},
+ 106	                {"$set": doc},
+ 107	                upsert=True
+ 108	            )
+ 109	
+ 110	            return True
+ 111	        except Exception as e:
+ 112	            print(f"[ERROR] 同步元数据失败 ({collection_id}): {e}")
+ 113	            return False
+ 114	
+ 115	    def sync_collection_samples(self, collection_id: str, batch_size: int = 1000) -> int:
+ 116	        """
+ 117	        同步单个采集的所有样本数据
+ 118	
+ 119	        Args:
+ 120	            collection_id: 采集ID
+ 121	            batch_size: 批量写入大小
+ 122	
+ 123	        Returns:
+ 124	            同步的样本数量
+ 125	        """
+ 126	        try:
+ 127	            # 获取总样本数
+ 128	            total_count = self.redis_db.get_sample_count(collection_id)
+ 129	
+ 130	            if total_count == 0:
+ 131	                print(f"[INFO] 采集 {collection_id} 没有数据")
+ 132	                return 0
+ 133	
+ 134	            print(f"[INFO] 开始同步采集 {collection_id} 的数据 ({total_count} 条)...")
+ 135	
+ 136	            synced_count = 0
+ 137	            batch_operations = []
+ 138	
+ 139	            # 使用 tqdm 显示进度条
+ 140	            with tqdm(total=total_count, desc=f"同步 {collection_id[:20]}...", unit="条") as pbar:
+ 141	                offset = 0
+ 142	                while offset < total_count:
+ 143	                    # 批量获取数据
+ 144	                    data_list = self.redis_db.get_collection_data(
+
+
+--------------------------------------------------------------------------------
+文件：核心模块\数据同步\sync_to_mongo.py
+--------------------------------------------------------------------------------
+[第 20 页]
+
+ 145	                        collection_id,
+ 146	                        offset,
+ 147	                        offset + batch_size - 1
+ 148	                    )
+ 149	
+ 150	                    if not data_list:
+ 151	                        break
+ 152	
+ 153	                    # 构建批量操作
+ 154	                    for data in data_list:
+ 155	                        doc = {
+ 156	                            "collection_id": collection_id,
+ 157	                            "timestamp": data['timestamp'],
+ 158	                            "datetime": datetime.fromtimestamp(data['timestamp']).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+ 159	                            "fans": data['fans'],
+ 160	                            "temp_sensors": data['temp_sensors'],
+ 161	                            "wind_speed_sensors": data['wind_speed_sensors'],
+ 162	                            "temp_humidity_sensors": data['temp_humidity_sensors'],
+ 163	                            "pressure_sensor": data['pressure_sensor']
+ 164	                        }
+ 165	
+ 166	                        batch_operations.append(
+ 167	                            UpdateOne(
+ 168	                                {
+ 169	                                    "collection_id": collection_id,
+ 170	                                    "timestamp": data['timestamp']
+ 171	                                },
+ 172	                                {"$set": doc},
+ 173	                                upsert=True
+ 174	                            )
+ 175	                        )
+ 176	
+ 177	                        synced_count += 1
+ 178	                        pbar.update(1)
+ 179	
+ 180	                    # 批量写入
+ 181	                    if batch_operations:
+ 182	                        self.samples_col.bulk_write(batch_operations, ordered=False)
+ 183	                        batch_operations.clear()
+ 184	
+ 185	                    offset += len(data_list)
+ 186	
+ 187	            print(f"[OK] 采集 {collection_id} 同步完成 ({synced_count} 条)")
+ 188	            return synced_count
+ 189	
+ 190	        except Exception as e:
+ 191	            print(f"[ERROR] 同步样本数据失败 ({collection_id}): {e}")
+ 192	            return 0
+ 193	
+ 194	    def sync_all(self, delete_missing: bool = False) -> Dict[str, Any]:
+
+
+--------------------------------------------------------------------------------
+文件：核心模块\数据同步\sync_to_mongo.py
+--------------------------------------------------------------------------------
+[第 21 页]
+
+ 195	        """
+ 196	        同步所有采集数据
+ 197	
+ 198	        Args:
+ 199	            delete_missing: 是否删除 MongoDB 中存在但 Redis 中不存在的数据
+ 200	
+ 201	        Returns:
+ 202	            同步结果统计
+ 203	        """
+ 204	        print("\n" + "="*50)
+ 205	        print("开始同步 Redis -> MongoDB")
+ 206	        print("="*50 + "\n")
+ 207	
+ 208	        start_time = time.time()
+ 209	        result = {
+ 210	            "collections_synced": 0,
+ 211	            "samples_synced": 0,
+ 212	            "errors": []
+ 213	        }
+ 214	
+ 215	        try:
+ 216	            # 获取所有采集列表
+ 217	            collections = self.redis_db.get_collections_list()
+ 218	
+ 219	            if not collections:
+ 220	                print("[INFO] Redis 中没有采集数据")
+ 221	                return result
+ 222	
+ 223	            print(f"[INFO] 发现 {len(collections)} 个采集记录\n")
+ 224	
+ 225	            # 同步每个采集
+ 226	            for coll in collections:
+ 227	                collection_id = coll['id']
+ 228	
+ 229	                # 同步元数据
+ 230	                if self.sync_collection_meta(collection_id):
+ 231	                    result["collections_synced"] += 1
+ 232	                else:
+ 233	                    result["errors"].append(f"元数据同步失败: {collection_id}")
+ 234	                    continue
+ 235	
+ 236	                # 同步样本数据
+ 237	                sample_count = self.sync_collection_samples(collection_id)
+ 238	                result["samples_synced"] += sample_count
+ 239	
+ 240	                print()  # 空行分隔
+ 241	
+ 242	            # 可选：删除 MongoDB 中多余的数据
+ 243	            if delete_missing:
+ 244	                self._delete_missing_collections(collections)
+
+
+--------------------------------------------------------------------------------
+文件：核心模块\数据同步\sync_to_mongo.py
+--------------------------------------------------------------------------------
+[第 22 页]
+
+ 245	
+ 246	        except Exception as e:
+ 247	            result["errors"].append(f"同步过程出错: {str(e)}")
+ 248	            print(f"[ERROR] 同步过程出错: {e}")
+ 249	
+ 250	        # 打印统计结果
+ 251	        elapsed_time = time.time() - start_time
+ 252	        print("\n" + "="*50)
+ 253	        print("同步完成")
+ 254	        print("="*50)
+ 255	        print(f"采集记录: {result['collections_synced']} 个")
+ 256	        print(f"样本数据: {result['samples_synced']} 条")
+ 257	        print(f"耗时: {elapsed_time:.2f} 秒")
+ 258	
+ 259	        if result["errors"]:
+ 260	            print(f"\n错误 ({len(result['errors'])}):")
+ 261	            for error in result["errors"]:
+ 262	                print(f"  - {error}")
+ 263	
+ 264	        return result
+ 265	
+ 266	    def _delete_missing_collections(self, redis_collections: List[Dict]):
+ 267	        """删除 MongoDB 中存在但 Redis 中不存在的数据"""
+ 268	        redis_ids = {coll['id'] for coll in redis_collections}
+ 269	
+ 270	        # 查找 MongoDB 中的所有 collection_id
+ 271	        mongo_ids = set(self.collections_col.distinct("collection_id"))
+ 272	
+ 273	        # 找出需要删除的
+ 274	        to_delete = mongo_ids - redis_ids
+ 275	
+ 276	        if to_delete:
+ 277	            print(f"\n[INFO] 删除 MongoDB 中多余的 {len(to_delete)} 个采集...")
+ 278	            for coll_id in to_delete:
+ 279	                # 删除样本数据
+ 280	                self.samples_col.delete_many({"collection_id": coll_id})
+ 281	                # 删除元数据
+ 282	                self.collections_col.delete_one({"collection_id": coll_id})
+ 283	            print(f"[OK] 已删除 {len(to_delete)} 个多余的采集")
+ 284	
+ 285	    def get_sync_status(self) -> Dict[str, Any]:
+ 286	        """获取同步状态"""
+ 287	        redis_collections = self.redis_db.get_collections_list()
+ 288	        mongo_collections = list(self.collections_col.find({}, {"_id": 0, "collection_id": 1, "sample_count": 1}))
+ 289	
+ 290	        redis_ids = {coll['id'] for coll in redis_collections}
+ 291	        mongo_ids = {coll['collection_id'] for coll in mongo_collections}
+ 292	
+ 293	        return {
+ 294	            "redis_collections": len(redis_collections),
+
+
+--------------------------------------------------------------------------------
+文件：核心模块\数据同步\sync_to_mongo.py
+--------------------------------------------------------------------------------
+[第 23 页]
+
+ 295	            "mongo_collections": len(mongo_collections),
+ 296	            "synced": len(redis_ids & mongo_ids),
+ 297	            "missing_in_mongo": len(redis_ids - mongo_ids),
+ 298	            "extra_in_mongo": len(mongo_ids - redis_ids)
+ 299	        }
+ 300	
+ 301	    def close(self):
+ 302	        """关闭连接"""
+ 303	        self.client.close()
+ 304	
+ 305	
+ 306	def main():
+ 307	    """主函数"""
+ 308	    import argparse
+ 309	
+ 310	    parser = argparse.ArgumentParser(description="Redis 到 MongoDB 数据同步工具")
+ 311	    parser.add_argument("--mongo-uri", default="mongodb://localhost:27017/",
+ 312	                        help="MongoDB 连接字符串")
+ 313	    parser.add_argument("--db-name", default="sensor_data",
+ 314	                        help="MongoDB 数据库名称")
+ 315	    parser.add_argument("--delete-missing", action="store_true",
+ 316	                        help="删除 MongoDB 中存在但 Redis 中不存在的数据")
+ 317	    parser.add_argument("--status", action="store_true",
+ 318	                        help="仅显示同步状态")
+ 319	
+ 320	    args = parser.parse_args()
+ 321	
+ 322	    try:
+ 323	        sync = MongoSync(mongo_uri=args.mongo_uri, db_name=args.db_name)
+ 324	
+ 325	        if args.status:
+ 326	            # 仅显示状态
+ 327	            status = sync.get_sync_status()
+ 328	            print("\n同步状态:")
+ 329	            print(f"  Redis 采集数: {status['redis_collections']}")
+ 330	            print(f"  MongoDB 采集数: {status['mongo_collections']}")
+ 331	            print(f"  已同步: {status['synced']}")
+ 332	            print(f"  未同步: {status['missing_in_mongo']}")
+ 333	            print(f"  多余数据: {status['extra_in_mongo']}")
+ 334	        else:
+ 335	            # 执行同步
+ 336	            sync.sync_all(delete_missing=args.delete_missing)
+ 337	
+ 338	        sync.close()
+ 339	
+ 340	    except KeyboardInterrupt:
+ 341	        print("\n\n[INFO] 用户中断")
+ 342	    except Exception as e:
+ 343	        print(f"\n[ERROR] 程序异常: {e}")
+ 344	        sys.exit(1)
+
+
+--------------------------------------------------------------------------------
+文件：核心模块\数据同步\sync_to_mongo.py
+--------------------------------------------------------------------------------
+[第 24 页]
+
+ 345	
+ 346	
+ 347	if __name__ == '__main__':
+ 348	    main()
+ 349	
+
+--------------------------------------------------------------------------------
+文件：仪表盘\main.py
+--------------------------------------------------------------------------------
+[第 24 页]
+
+   1	# main.py
+   2	import sys
+   3	import os
+   4	from PySide6.QtWidgets import QApplication
+   5	
+   6	# 添加当前目录到路径
+   7	current_dir = os.path.dirname(os.path.abspath(__file__))
+   8	if current_dir not in sys.path:
+   9	    sys.path.insert(0, current_dir)
+  10	
+  11	from ui_main_window import GlobalDashboardWindow
+  12	
+  13	def main():
+  14	    app = QApplication(sys.argv)
+  15	    window = GlobalDashboardWindow()
+  16	    window.show()
+  17	    return app.exec()
+  18	
+  19	if __name__ == "__main__":
+  20	    sys.exit(main())
+  21	
+
+--------------------------------------------------------------------------------
+文件：仪表盘\ui_main_window.py
+--------------------------------------------------------------------------------
+[第 24 页]
+
+   1	# ui_main_window.py
+   2	from PySide6.QtWidgets import QMainWindow, QToolBar, QPushButton, QTableWidgetItem, QApplication
+   3	from PySide6.QtCore import QDateTime, QTimer, QPoint, Qt
+   4	import random
+   5	
+   6	from ui_custom_widgets import BackgroundWidget, ThemeSwitch
+   7	from core_theme_manager import apply_theme, themes
+   8	from core_data_simulator import DataSimulator
+   9	import ui_docks as Docks
+  10	import debug
+  11	from ui_motion_capture import CameraSettingsDock
+  12	from ui_sensor_dock import create_sensor_data_dock
+  13	
+  14	# 【新增】导入动捕采集窗口
+  15	import sys
+  16	import os
+  17	# 添加动捕模块路径
+  18	motion_capture_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '动捕')
+  19	if motion_capture_path not in sys.path:
+  20	    sys.path.insert(0, motion_capture_path)
+  21	
+  22	class GlobalDashboardWindow(QMainWindow):
+  23	    def __init__(self):
+  24	        super().__init__()
+
+
+--------------------------------------------------------------------------------
+文件：仪表盘\ui_main_window.py
+--------------------------------------------------------------------------------
+[第 25 页]
+
+  25	        
+  26	        self.setObjectName("GlobalDashboardWindow")
+  27	        
+  28	        self.setWindowTitle("微小型无人机智能风场测试评估系统 - 全局监控仪表盘")
+  29	        
+  30	        self.resize(1200, 850)
+  31	        
+  32	        self.device_on = False
+  33	        
+  34	        self.comm_indicators = []
+  35	        
+  36	        self.DEFAULT_COMM_PROTOCOLS = {
+  37	            "主控制器": "TCP/IP", "电驱": "EtherCAT", "风速传感": "EtherCAT",
+  38	            "温度传感": "EtherCAT", "湿度传感": "EtherCAT", "动捕": "API",
+  39	            "俯仰伺服": "Modbus", "造雨": "Modbus", "喷雾": "Modbus",
+  40	            "训练": "API", "仿真": "API", "电力": "Modbus"
+  41	        }
+  42	        
+  43	        self.comm_protocols = self.DEFAULT_COMM_PROTOCOLS.copy()
+  44	        
+  45	        self.protocol_combos = {}
+  46	        
+  47	        self.comm_info_box = None
+  48	        
+  49	        self.themes = themes
+  50	        
+  51	        self.current_theme = "dark"
+  52	        
+  53	        self.docks = {}
+  54	        
+  55	        self.toolbar_buttons = {}
+  56	        
+  57	        self._create_mock_camera_data()
+  58	        
+  59	        self.setup_ui()
+  60	        
+  61	        self.data_simulator = DataSimulator(self)
+  62	        
+  63	        self.data_simulator.data_updated.connect(self.on_data_updated)
+  64	        
+  65	        self.data_simulator.comm_speed_updated.connect(self.on_comm_speed_updated)
+  66	        
+  67	        self.time_updater = QTimer(self)
+  68	        
+  69	        self.time_updater.timeout.connect(self.update_time_label)
+  70	        
+  71	        self.time_updater.start(1000)
+  72	        
+  73	        self.update_device_state()
+  74	
+
+
+--------------------------------------------------------------------------------
+文件：仪表盘\ui_main_window.py
+--------------------------------------------------------------------------------
+[第 26 页]
+
+  75	        debug.log_debug("主窗口初始化完成。")
+  76	
+  77	    def changeEvent(self, event):
+  78	        """处理窗口状态变化事件"""
+  79	        if event.type() == event.Type.WindowStateChange:
+  80	            old_state = event.oldState()
+  81	            new_state = self.windowState()
+  82	
+  83	            # 即将最小化时，保存所有dock的完整状态
+  84	            if (new_state & Qt.WindowMinimized) and not (old_state & Qt.WindowMinimized):
+  85	                debug.log_debug("[changeEvent] 主窗口即将最小化，保存所有dock状态")
+  86	                self._save_docks_visibility()
+  87	
+  88	            # 从最小化恢复时，延迟恢复所有dock的状态
+  89	            elif (old_state & Qt.WindowMinimized) and not (new_state & Qt.WindowMinimized):
+  90	                debug.log_debug("[changeEvent] 主窗口从最小化恢复，准备恢复所有dock状态")
+  91	                # 使用定时器延迟执行，确保窗口完全恢复后再操作dock
+  92	                QTimer.singleShot(50, self._restore_docks_visibility)
+  93	
+  94	        super().changeEvent(event)
+  95	
+  96	    def _save_docks_visibility(self):
+  97	        """主窗口最小化时，保存所有dock的完整状态（位置、大小、可见性）"""
+  98	        self._docks_state_before_minimize = {}
+  99	        for name, dock in self.docks.items():
+ 100	            if dock:
+ 101	                # 使用_visible_before_hide属性来判断dock原本是否可见
+ 102	                # 因为最小化时Qt已经自动隐藏了所有子窗口，isVisible()会返回False
+ 103	                was_visible = getattr(dock, '_visible_before_hide', False)
+ 104	                self._docks_state_before_minimize[name] = {
+ 105	                    'visible': was_visible,
+ 106	                    'x': dock.x(),
+ 107	                    'y': dock.y(),
+ 108	                    'width': dock.width(),
+ 109	                    'height': dock.height()
+ 110	                }
+ 111	                debug.log_debug(f"  保存dock状态: {name} -> visible={was_visible}, pos=({dock.x()}, {dock.y()}), size=({dock.width()}, {dock.height()})")
+ 112	
+ 113	    def _restore_docks_visibility(self):
+ 114	        """主窗口恢复时，恢复所有dock到最小化前的完整状态（位置、大小、可见性）"""
+ 115	        debug.log_debug("[_restore_docks_visibility] 开始恢复dock状态")
+ 116	
+ 117	        if not hasattr(self, '_docks_state_before_minimize'):
+ 118	            debug.log_debug("  没有保存的状态，使用默认行为")
+ 119	            self._restore_all_docks_visibility()
+ 120	            return
+ 121	
+ 122	        debug.log_debug(f"  已保存的dock数量: {len(self._docks_state_before_minimize)}")
+ 123	        for name, state in self._docks_state_before_minimize.items():
+ 124	            debug.log_debug(f"    {name}: visible={state['visible']}, pos=({state['x']}, {state['y']}), size=({state['width']}, {state['height']})")
+
+
+--------------------------------------------------------------------------------
+文件：仪表盘\ui_main_window.py
+--------------------------------------------------------------------------------
+[第 27 页]
+
+ 125	
+ 126	        for name, dock in self.docks.items():
+ 127	            if dock and name in self._docks_state_before_minimize:
+ 128	                state = self._docks_state_before_minimize[name]
+ 129	                # 先设置位置和大小
+ 130	                dock.move(state['x'], state['y'])
+ 131	                dock.resize(state['width'], state['height'])
+ 132	                # 然后根据可见性显示或隐藏
+ 133	                if state['visible']:
+ 134	                    dock.show()
+ 135	                    dock.raise_()
+ 136	                    debug.log_debug(f"  ✓ 恢复dock: {name} -> pos=({state['x']}, {state['y']}), size=({state['width']}, {state['height']})")
+ 137	                else:
+ 138	                    dock.hide()
+ 139	                    debug.log_debug(f"  ✗ 保持隐藏dock: {name}")
+ 140	            else:
+ 141	                if dock:
+ 142	                    debug.log_debug(f"  ! dock '{name}' 没有保存的状态")
+ 143	
+ 144	        # 强制刷新界面
+ 145	        self.update()
+ 146	
+ 147	    def _update_dock_geometry(self, dock):
+ 148	        """当dock被拖动或调整大小时，更新保存的状态"""
+ 149	        # 找到对应的dock名称
+ 150	        dock_name = None
+ 151	        for name, d in self.docks.items():
+ 152	            if d is dock:
+ 153	                dock_name = name
+ 154	                break
+ 155	
+ 156	        if dock_name:
+ 157	            # 确保_docks_state_before_minimize存在
+ 158	            if not hasattr(self, '_docks_state_before_minimize'):
+ 159	                self._docks_state_before_minimize = {}
+ 160	
+ 161	            # 使用_visible_before_hide来判断dock是否可见
+ 162	            was_visible = getattr(dock, '_visible_before_hide', False)
+ 163	
+ 164	            # 更新保存的状态中的位置和大小
+ 165	            self._docks_state_before_minimize[dock_name] = {
+ 166	                'visible': was_visible,
+ 167	                'x': dock.x(),
+ 168	                'y': dock.y(),
+ 169	                'width': dock.width(),
+ 170	                'height': dock.height()
+ 171	            }
+ 172	            debug.log_debug(f"  更新dock位置和大小: {dock_name} -> pos=({dock.x()}, {dock.y()}), size=({dock.width()}, {dock.height()})")
+ 173	
+ 174	    def _restore_all_docks_visibility(self):
+
+
+--------------------------------------------------------------------------------
+文件：仪表盘\ui_main_window.py
+--------------------------------------------------------------------------------
+[第 28 页]
+
+ 175	        """备用方法：重新显示所有之前标记为可见的dock"""
+ 176	        for name, dock in self.docks.items():
+ 177	            if dock and hasattr(dock, '_visible_before_hide') and dock._visible_before_hide:
+ 178	                dock.show()
+ 179	                dock.raise_()
+ 180	                debug.log_debug(f"  重新显示dock: {name}")
+ 181	
+ 182	    def _create_mock_camera_data(self):
+ 183	        """为20个相机创建模拟数据"""
+ 184	        self.camera_data = {}
+ 185	        statuses = ["green"] * 15 + ["yellow"] * 3 + ["red"] * 2
+ 186	        random.shuffle(statuses)
+ 187	        
+ 188	        for i in range(1, 21):
+ 189	            self.camera_data[i] = {
+ 190	                "id": i,
+ 191	                "status": statuses[i-1],
+ 192	                "ip": f"192.168.1.{100+i}",
+ 193	                "subnet": "255.255.255.0",
+ 194	                "gateway": "192.168.1.1",
+ 195	                "dhcp": False,
+ 196	                "firmware": "v1.2.3",
+ 197	                "framerate": 210,
+ 198	                "resolution": "2048x1536",
+ 199	                "exposure": random.randint(40, 80),
+ 200	                "threshold": random.randint(30, 70),
+ 201	                "led_brightness": random.randint(70, 100),
+ 202	                "marker_min_size": 5,
+ 203	                "marker_max_size": 120,
+ 204	                "sync_mode": "外部同步"
+ 205	            }
+ 206	
+ 207	    def setup_ui(self):
+ 208	        self.canvas = BackgroundWidget("背景.png", 0.5)
+ 209	        self.setCentralWidget(self.canvas)
+ 210	
+ 211	        self.toolbar = QToolBar("主工具栏")
+ 212	        self.addToolBar(self.toolbar)
+ 213	
+ 214	        # --- 创建 Docks ---
+ 215	        self.docks['系统'] = Docks.create_system_dock(self)
+ 216	        self.docks['通讯'] = Docks.create_comm_dock(self)  # 现在包含电力模块
+ 217	        # 电力模块（电流、电压、功率）已整合到通讯dock中，不再创建独立dock
+ 218	        self.docks['环境'] = Docks.create_env_dock(self)
+ 219	        self.docks['日志'] = Docks.create_log_dock(self)
+ 220	        # 俯仰、造雨、示踪整合为一个组合dock
+ 221	        self.docks['俯仰·造雨·示踪'] = Docks.create_combined_pitch_rain_trace_dock(self)
+ 222	        self.docks['风机'] = Docks.create_fan_dock(self)
+ 223	
+ 224	        self.camera_status_lights = []
+
+
+--------------------------------------------------------------------------------
+文件：仪表盘\ui_main_window.py
+--------------------------------------------------------------------------------
+[第 29 页]
+
+ 225	        self.docks['动捕'] = Docks.create_motion_capture_dock(self)
+ 226	
+ 227	        self.docks['标定'] = Docks.create_calibration_dock(self)
+ 228	        self.docks['仿真'] = Docks.create_simulation_dock(self)
+ 229	        self.docks['训练'] = Docks.create_training_dock(self)
+ 230	        self.docks['设置'] = Docks.create_settings_dock(self)
+ 231	
+ 232	        self.docks['TCP/IP设置'] = Docks.create_tcp_settings_dock(self)
+ 233	        self.docks['Modbus RTU设置'] = Docks.create_modbus_settings_dock(self)
+ 234	        self.docks['EtherCAT设置'] = Docks.create_ethercat_settings_dock(self)
+ 235	        self.docks['API设置'] = Docks.create_api_settings_dock(self)
+ 236	
+ 237	        # --- 创建单例和隐藏的 Docks ---
+ 238	        # Parent is None to be a true top-level window, not constrained by the main window
+ 239	        self.camera_settings_dock = CameraSettingsDock(self.canvas)
+ 240	        self.docks['相机详细设置'] = self.camera_settings_dock
+ 241	        self.camera_settings_dock.hide()
+ 242	        self.docks['相机详细设置'] = self.camera_settings_dock
+ 243	        self.camera_settings_dock.hide()
+ 244	
+ 245	        # --- 创建动捕视场Dock ---
+ 246	        self.docks['动捕视场'] = Docks.create_motion_capture_view_dock(self)
+ 247	        self.docks['动捕视场'].hide()
+ 248	
+ 249	        # --- 创建传感器数据Dock ---
+ 250	        self.docks['传感器数据'] = create_sensor_data_dock(self)
+ 251	        self.docks['传感器数据'].hide()
+ 252	
+ 253	        # Position default Docks - 设置默认dock的位置
+ 254	        self.docks['系统'].move(20, 10); self.docks['系统'].resize(250, 135)
+ 255	        self.docks['通讯'].move(280, 10); self.docks['通讯'].resize(910, 310)
+ 256	        self.docks['环境'].move(20, 330); self.docks['环境'].resize(350, 300)
+ 257	        self.docks['日志'].move(390, 330); self.docks['日志'].resize(800, 300)
+ 258	
+ 259	        # Hide all non-default docks initially
+ 260	        default_docks = ['系统', '通讯', '环境', '日志']
+ 261	        for name, dock in self.docks.items():
+ 262	            if name not in default_docks:
+ 263	                dock.hide()
+ 264	            else:
+ 265	                # 确保默认dock的可见性标记被设置
+ 266	                dock._visible_before_hide = True
+ 267	
+ 268	        # Setup Toolbar
+ 269	        button_order = ["系统", "通讯", "环境", "日志",
+ 270	                        "俯仰·造雨·示踪", "风机", "动捕", "传感器数据", "标定", "仿真", "训练"]
+ 271	
+ 272	        dynamic_docks = ['俯仰·造雨·示踪', '风机', '动捕', '传感器数据', '标定', '仿真', '训练', '设置']
+ 273	
+ 274	        for name in button_order:
+
+
+--------------------------------------------------------------------------------
+文件：仪表盘\ui_main_window.py
+--------------------------------------------------------------------------------
+[第 30 页]
+
+ 275	            button = QPushButton(name)
+ 276	            button.setCheckable(True)
+ 277	            # 对于默认dock，初始应该是checked状态
+ 278	            initial_checked = name in default_docks
+ 279	            button.setChecked(initial_checked)
+ 280	
+ 281	            if name in dynamic_docks:
+ 282	                button.toggled.connect(lambda checked, n=name: self.toggle_dynamic_dock(n, checked))
+ 283	            else:
+ 284	                button.toggled.connect(self.docks[name].setVisible)
+ 285	
+ 286	            self.docks[name].visibilityChanged.connect(button.setChecked)
+ 287	
+ 288	            # 根据按钮文字长度设置按钮大小
+ 289	            if name == "俯仰·造雨·示踪":
+ 290	                button.setFixedSize(115, 30)  # 为长文字按钮设置更大的宽度
+ 291	            elif name == "传感器数据":
+ 292	                button.setFixedSize(80, 30)  # 传感器数据按钮稍宽
+ 293	            else:
+ 294	                button.setFixedSize(45, 30)
+ 295	
+ 296	            self.toolbar_buttons[name] = button
+ 297	            self.toolbar.addWidget(button)
+ 298	        
+ 299	        self.toolbar.addSeparator()
+ 300	
+ 301	        settings_button = QPushButton("设置")
+ 302	        settings_button.setCheckable(True)
+ 303	        settings_button.setChecked(self.docks['设置'].isVisible())
+ 304	        settings_button.toggled.connect(lambda checked: self.toggle_dynamic_dock('设置', checked))
+ 305	        self.docks['设置'].visibilityChanged.connect(settings_button.setChecked)
+ 306	        settings_button.setFixedSize(45, 30)
+ 307	        self.toolbar.addWidget(settings_button)
+ 308	        
+ 309	        self.theme_switch = ThemeSwitch()
+ 310	        self.theme_switch.set_on(self.current_theme == "dark")
+ 311	        self.theme_switch.toggled.connect(self._on_theme_switched)
+ 312	        self.toolbar.addWidget(self.theme_switch)
+ 313	        
+ 314	        self.estop_button = QPushButton("急停")
+ 315	        self.switch_button = QPushButton()
+ 316	        
+ 317	        self.estop_button.setFixedSize(70, 30)
+ 318	        self.switch_button.setFixedSize(70, 30)
+ 319	        
+ 320	        self.estop_button.clicked.connect(self.handle_estop)
+ 321	        self.switch_button.clicked.connect(self.handle_switch_toggle)
+ 322	
+ 323	        self.toolbar.addWidget(self.estop_button)
+ 324	        self.toolbar.addWidget(self.switch_button)
+
+
+================================================================================
+                                    后30页源代码                                     
+================================================================================
+
+
+--------------------------------------------------------------------------------
+文件：tests\test_utils.py
+--------------------------------------------------------------------------------
+[第 31 页]
+
+ 263	
+ 262	    unittest.main()
+ 261	if __name__ == '__main__':
+ 260	
+ 259	
+ 258	            self.skipTest(f"无法导入fan_id_generator: {e}")
+ 257	        except ImportError as e:
+ 256	            self.assertTrue(True)
+ 255	            from 前处理.CFD_module.fan_id_generator import generate_fan_id
+ 254	        try:
+ 253	        """测试风扇ID生成器导入"""
+ 252	    def test_fan_id_generator_import(self):
+ 251	
+ 250	    """测试风扇ID生成器"""
+ 249	class TestFanIdGenerator(unittest.TestCase):
+ 248	
+ 247	
+ 246	        self.assertAlmostEqual(coords[-1], length, places=5)
+ 245	        # 终点应该非常接近目标长度
+ 244	
+ 243	        coords = generate_stretched_coords_by_size(length, first_cell_size, ratio)
+ 242	
+ 241	        ratio = 1.15
+ 240	        first_cell_size = 5.0
+ 239	        length = 123.456
+ 238	
+ 237	        from 前处理.CFD_module.grid_utils import generate_stretched_coords_by_size
+ 236	        """测试终点精度"""
+ 235	    def test_precision_of_endpoint(self):
+ 234	
+ 233	        self.assertLessEqual(len(coords), 102)  # 100个单元 + 初始点0 + 终点length
+ 232	        # 函数添加初始点和终点，所以最多是max_cells + 2
+ 231	        # 验证不会超过最大单元数太多
+ 230	
+ 229	        coords = generate_stretched_coords_by_size(length, first_cell_size, ratio, max_cells=100)
+ 228	
+ 227	        ratio = 1.01
+ 226	        first_cell_size = 0.1
+ 225	        length = 100000.0
+ 224	        # 使用大长度和很小的初始单元，确保会触发max_cells限制
+ 223	
+ 222	        from 前处理.CFD_module.grid_utils import generate_stretched_coords_by_size
+ 221	        """测试最大单元数限制"""
+ 220	    def test_max_cells_limit(self):
+ 219	
+ 218	            self.assertAlmostEqual(spacing, first_cell_size, places=5)
+ 217	        for spacing in spacings:
+ 216	        # 所有间距应该相等
+ 215	
+ 214	        spacings = np.diff(coords)
+
+
+--------------------------------------------------------------------------------
+文件：tests\test_utils.py
+--------------------------------------------------------------------------------
+[第 32 页]
+
+ 213	        # 计算单元间距
+ 212	
+ 211	        coords = generate_stretched_coords_by_size(length, first_cell_size, ratio)
+ 210	
+ 209	        ratio = 1.0  # 无拉伸
+ 208	        first_cell_size = 10.0
+ 207	        length = 100.0
+ 206	
+ 205	        from 前处理.CFD_module.grid_utils import generate_stretched_coords_by_size
+ 204	        """测试比率为1时不拉伸"""
+ 203	    def test_ratio_1_no_stretching(self):
+ 202	
+ 201	        self.assertGreater(increasing_ratio, 0.8)
+ 200	        increasing_ratio = increasing_count / (len(spacings) - 1)
+ 199	        # 至少80%的间距应该是递增的
+ 198	
+ 197	                increasing_count += 1
+ 196	            if spacings[i + 1] > spacings[i]:
+ 195	        for i in range(len(spacings) - 1):
+ 194	        increasing_count = 0
+ 193	        # 注意：最后的缩放步骤可能导致最后几个点不严格递增
+ 192	        # 验证大部分间距是递增的（由于拉伸比）
+ 191	
+ 190	        spacings = np.diff(coords)
+ 189	        # 计算单元间距
+ 188	
+ 187	        coords = generate_stretched_coords_by_size(length, first_cell_size, ratio)
+ 186	
+ 185	        ratio = 1.2  # 20%拉伸
+ 184	        first_cell_size = 1.0
+ 183	        length = 100.0
+ 182	
+ 181	        from 前处理.CFD_module.grid_utils import generate_stretched_coords_by_size
+ 180	        """测试拉伸效果"""
+ 179	    def test_stretching_effect(self):
+ 178	
+ 177	        self.assertEqual(coords[0], 0.0)
+ 176	        self.assertEqual(len(coords), 1)
+ 175	        # 应该返回只包含0的数组
+ 174	
+ 173	        coords = generate_stretched_coords_by_size(1e-7, 1.0, 1.1)
+ 172	
+ 171	        from 前处理.CFD_module.grid_utils import generate_stretched_coords_by_size
+ 170	        """测试极小长度情况"""
+ 169	    def test_very_small_length(self):
+ 168	
+ 167	        self.assertEqual(coords[0], 0.0)
+ 166	        self.assertEqual(len(coords), 1)
+ 165	        # 应该返回只包含0的数组
+ 164	
+
+
+--------------------------------------------------------------------------------
+文件：tests\test_utils.py
+--------------------------------------------------------------------------------
+[第 33 页]
+
+ 163	        coords = generate_stretched_coords_by_size(0.0, 1.0, 1.1)
+ 162	
+ 161	        from 前处理.CFD_module.grid_utils import generate_stretched_coords_by_size
+ 160	        """测试零长度情况"""
+ 159	    def test_zero_length(self):
+ 158	
+ 157	            self.assertLess(coords[i], coords[i + 1])
+ 156	        for i in range(len(coords) - 1):
+ 155	        # 验证坐标是单调递增的
+ 154	
+ 153	        self.assertAlmostEqual(coords[-1], length, places=5)
+ 152	        # 验证终点接近length
+ 151	
+ 150	        self.assertEqual(coords[0], 0.0)
+ 149	        # 验证起点是0
+ 148	
+ 147	        self.assertIsInstance(coords, np.ndarray)
+ 146	        # 验证返回的是numpy数组
+ 145	
+ 144	        coords = generate_stretched_coords_by_size(length, first_cell_size, ratio)
+ 143	
+ 142	        ratio = 1.1
+ 141	        first_cell_size = 5.0
+ 140	        length = 100.0
+ 139	
+ 138	        from 前处理.CFD_module.grid_utils import generate_stretched_coords_by_size
+ 137	        """测试基本坐标生成"""
+ 136	    def test_basic_coords_generation(self):
+ 135	
+ 134	            self.skipTest(f"无法导入generate_stretched_coords_by_size: {e}")
+ 133	        except ImportError as e:
+ 132	            self.generate_stretched_coords_by_size = generate_stretched_coords_by_size
+ 131	            from 前处理.CFD_module.grid_utils import generate_stretched_coords_by_size
+ 130	        try:
+ 129	        """测试函数导入"""
+ 128	    def test_generate_stretched_coords_import(self):
+ 127	
+ 126	    """测试网格工具函数"""
+ 125	class TestGridUtils(unittest.TestCase):
+ 124	
+ 123	
+ 122	        text_below = get_contrasting_text_color(below_threshold)
+ 121	        below_threshold = QColor(130, 130, 130)
+ 120	        # 测试刚好在阈值之下的颜色
+ 119	
+ 118	        text_above = get_contrasting_text_color(above_threshold)
+ 117	        above_threshold = QColor(150, 150, 150)
+ 116	        # 测试刚好在阈值之上的颜色
+ 115	
+ 114	        # 140 = 0.299*R + 0.587*G + 0.114*B
+
+
+--------------------------------------------------------------------------------
+文件：tests\test_utils.py
+--------------------------------------------------------------------------------
+[第 34 页]
+
+ 113	        # 亮度 = 0.299*R + 0.587*G + 0.114*B
+ 112	        # LUMINANCE_THRESHOLD是140
+ 111	
+ 110	        from PySide6.QtGui import QColor
+ 109	        from 风场设置.main_control.utils import get_contrasting_text_color
+ 108	        from 风场设置.main_control.config import LUMINANCE_THRESHOLD
+ 107	        """测试阈值边界"""
+ 106	    def test_threshold_boundary(self):
+ 105	
+ 104	        self.assertEqual(text_color, QColor(Qt.white))
+ 103	
+ 102	        text_color = get_contrasting_text_color(dark_bg)
+ 101	        dark_bg = QColor(0, 0, 0)
+ 100	        # 深色背景应该返回白色文本
+  99	
+  98	        from PySide6.QtCore import Qt
+  97	        from PySide6.QtGui import QColor
+  96	        from 风场设置.main_control.utils import get_contrasting_text_color
+  95	        """测试深色背景"""
+  94	    def test_dark_background(self):
+  93	
+  92	        self.assertEqual(text_color, QColor(Qt.black))
+  91	
+  90	        text_color = get_contrasting_text_color(light_bg)
+  89	        light_bg = QColor(255, 255, 255)
+  88	        # 浅色背景应该返回黑色文本
+  87	
+  86	        from PySide6.QtCore import Qt
+  85	        from PySide6.QtGui import QColor
+  84	        from 风场设置.main_control.utils import get_contrasting_text_color
+  83	        """测试浅色背景"""
+  82	    def test_light_background(self):
+  81	
+  80	            self.skipTest(f"无法导入get_contrasting_text_color: {e}")
+  79	        except ImportError as e:
+  78	            self.get_contrasting_text_color = get_contrasting_text_color
+  77	            from 风场设置.main_control.utils import get_contrasting_text_color
+  76	        try:
+  75	        """测试函数导入"""
+  74	    def test_contrasting_text_color_import(self):
+  73	
+  72	    """测试对比度文本颜色函数"""
+  71	class TestContrastingTextColor(unittest.TestCase):
+  70	
+  69	
+  68	        self.assertEqual(color1, color2)
+  67	
+  66	        color2 = value_to_color(25.0, 0.0, 100.0)
+  65	        color1 = value_to_color(25.0, 0.0, 100.0)
+  64	        # 相同的输入应该产生相同的输出
+
+
+--------------------------------------------------------------------------------
+文件：tests\test_utils.py
+--------------------------------------------------------------------------------
+[第 35 页]
+
+  63	
+  62	        from 风场设置.main_control.utils import value_to_color
+  61	        """测试颜色转换一致性"""
+  60	    def test_value_to_color_consistency(self):
+  59	
+  58	        self.assertEqual(color_above, color_at_max)
+  57	        self.assertEqual(color_below, color_at_min)
+  56	        # 裁剪后的颜色应该等于边界颜色
+  55	
+  54	        color_at_max = value_to_color(100.0, 0.0, 100.0)
+  53	        color_above = value_to_color(150.0, 0.0, 100.0)
+  52	
+  51	        color_at_min = value_to_color(0.0, 0.0, 100.0)
+  50	        color_below = value_to_color(-10.0, 0.0, 100.0)
+  49	        # 测试超出范围的值（应该被裁剪）
+  48	
+  47	        from 风场设置.main_control.utils import value_to_color
+  46	        """测试值裁剪功能"""
+  45	    def test_value_to_color_clamping(self):
+  44	
+  43	        self.assertIsInstance(color_max, QColor)
+  42	        color_max = value_to_color(100.0, 0.0, 100.0)
+  41	        # 测试最大值（应该是红色）
+  40	
+  39	        self.assertIsInstance(color_mid, QColor)
+  38	        color_mid = value_to_color(50.0, 0.0, 100.0)
+  37	        # 测试中间值（应该是绿色或黄色）
+  36	
+  35	        self.assertIsInstance(color_min, QColor)
+  34	        color_min = value_to_color(0.0, 0.0, 100.0)
+  33	        # 测试最小值（应该是蓝色）
+  32	
+  31	        from PySide6.QtGui import QColor
+  30	        from 风场设置.main_control.utils import value_to_color
+  29	        """测试值到颜色转换的范围"""
+  28	    def test_value_to_color_range(self):
+  27	
+  26	            self.skipTest(f"无法导入value_to_color: {e}")
+  25	        except ImportError as e:
+  24	            self.value_to_color = value_to_color
+  23	            from 风场设置.main_control.utils import value_to_color
+  22	        try:
+  21	        """测试函数导入"""
+  20	    def test_value_to_color_import(self):
+  19	
+  18	    """测试值到颜色转换函数"""
+  17	class TestValueToColor(unittest.TestCase):
+  16	
+  15	
+  14	    sys.path.insert(0, ROOT_DIR)
+
+
+--------------------------------------------------------------------------------
+文件：tests\test_utils.py
+--------------------------------------------------------------------------------
+[第 36 页]
+
+  13	if ROOT_DIR not in sys.path:
+  12	ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+  11	# 添加项目路径
+  10	
+   9	import numpy as np
+   8	import unittest
+   7	import os
+   6	import sys
+   5	"""
+   4	测试颜色转换、文本对比度、网格生成等工具函数
+   3	工具函数单元测试
+   2	"""
+   1	# -*- coding: utf-8 -*-
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 36 页]
+
+1013	
+1012	
+1011	
+1010	
+1009	
+1008	
+1007	        super().closeEvent(event)
+1006	        # 2. 调用父类的 closeEvent，让Qt继续执行正常的关闭流程
+1005	        
+1004	        self.plotter.close()
+1003	        # 1. 明确地关闭 plotter，释放VTK和OpenGL资源
+1002	        
+1001	        print("CFD_module window is closing. Safely shutting down the plotter...")
+1000	        """
+ 999	        在窗口正式关闭前，安全地关闭PyVista的plotter。
+ 998	        重写窗口关闭事件。
+ 997	        """
+ 996	    def closeEvent(self, event):
+ 995	
+ 994	            return False
+ 993	        except ImportError:
+ 992	            return cp.is_available()
+ 991	            import cupy as cp
+ 990	        try:
+ 989	        """检查GPU是否可用"""
+ 988	    def _check_gpu_available(self):
+ 987	
+ 986	        return None
+ 985	        # 暂时返回None，需要后续完善
+ 984	        # 可能需要从网格生成过程中获取，或让用户选择
+ 983	        # 这里需要根据实际情况实现
+ 982	        """获取VTM网格文件路径"""
+ 981	    def _get_vtm_file_path(self):
+ 980	
+ 979	        self.update_simulation_button_states()
+ 978	        self.log_message(message)
+ 977	        self.simulation_state = 'stopped' if success else 'idle'
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 37 页]
+
+ 976	        """处理仿真完成"""
+ 975	    def _on_simulation_finished(self, success, message):
+ 974	
+ 973	                print(f"设置残差图表失败: {e}")
+ 972	            if self.debug_logging_enabled:
+ 971	        except Exception as e:
+ 970	            self.ui.residual_plot_widget.setTitle("残差监控")
+ 969	            self.ui.residual_plot_widget.showGrid(x=True, y=True)
+ 968	            self.ui.residual_plot_widget.setLogMode(y=True)
+ 967	            self.ui.residual_plot_widget.setLabel('bottom', '迭代次数')
+ 966	            self.ui.residual_plot_widget.setLabel('left', '残差值')
+ 965	        try:
+ 964	        """设置残差监控图表"""
+ 963	    def setup_residual_plot(self):
+ 962	
+ 961	                print(f"刷新残差图表失败: {e}")
+ 960	            if self.debug_logging_enabled:
+ 959	        except Exception as e:
+ 958	
+ 957	            self.ui.residual_plot_widget.addLegend()
+ 956	            self.ui.residual_plot_widget.showGrid(x=True, y=True)
+ 955	            self.ui.residual_plot_widget.setLogMode(y=True)  # Y轴对数坐标
+ 954	            self.ui.residual_plot_widget.setLabel('bottom', '迭代次数')
+ 953	            self.ui.residual_plot_widget.setLabel('left', '残差值')
+ 952	            # 设置图表属性
+ 951	
+ 950	                    )
+ 949	                        name=key
+ 948	                        pen=pg.mkPen(color, width=2),
+ 947	                        values,
+ 946	                    self.ui.residual_plot_widget.plot(
+ 945	                    color = colors[i % len(colors)]
+ 944	                if values:  # 确保有数据
+ 943	            for i, (key, values) in enumerate(self.residual_history.items()):
+ 942	
+ 941	            colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown']
+ 940	            # 为每个残差类型绘制曲线
+ 939	
+ 938	            self.ui.residual_plot_widget.clear()
+ 937	        try:
+ 936	        """刷新残差监控图表"""
+ 935	    def _refresh_residual_plot(self):
+ 934	
+ 933	                print(f"更新残差图表失败: {e}")
+ 932	            if self.debug_logging_enabled:
+ 931	        except Exception as e:
+ 930	
+ 929	            self._refresh_residual_plot()
+ 928	            # 更新图表
+ 927	
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 38 页]
+
+ 926	                        self.residual_history[key] = self.residual_history[key][-self.max_residual_points:]
+ 925	                    if len(self.residual_history[key]) > self.max_residual_points:
+ 924	                    # 限制数据点数量
+ 923	                    self.residual_history[key].append(value)
+ 922	                if key in self.residual_history:
+ 921	            for key, value in residuals.items():
+ 920	            # 添加新的残差数据
+ 919	        try:
+ 918	        """更新残差监控图表"""
+ 917	    def _update_residual_plot(self, residuals):
+ 916	
+ 915	        self.log_message(message)
+ 914	        """处理仿真进度更新"""
+ 913	    def _on_simulation_progress(self, message):
+ 912	
+ 911	        self.simulation_thread.start()
+ 910	        self.simulation_thread.finished.connect(self._on_simulation_finished)
+ 909	        self.simulation_thread.residual_update.connect(self._update_residual_plot)
+ 908	        self.simulation_thread.progress.connect(self._on_simulation_progress)
+ 907	        self.simulation_thread = SimulationThread(self.solver_instance)
+ 906	        # 创建并启动仿真线程
+ 905	
+ 904	                    self.finished.emit(False, f"仿真失败: {str(e)}")
+ 903	                except Exception as e:
+ 902	
+ 901	                    self.finished.emit(True, "仿真完成")
+ 900	
+ 899	                        self.msleep(100)  # 模拟计算时间
+ 898	
+ 897	                            self.progress.emit(f"迭代 {iteration+1}/100")
+ 896	                            self.residual_update.emit(residuals)
+ 895	                            }
+ 894	                                'epsilon': 1e-2 * (1 + np.random.random())
+ 893	                                'k': 1e-2 * (1 + np.random.random()),
+ 892	                                'Continuity': 1e-4 * (1 + np.random.random()),
+ 891	                                'UZ': 1e-3 * (1 + np.random.random()),
+ 890	                                'UY': 1e-3 * (1 + np.random.random()),
+ 889	                                'UX': 1e-3 * (1 + np.random.random()),
+ 888	                            residuals = {
+ 887	                        if iteration % 5 == 0:  # 每5次迭代更新一次残差
+ 886	                        # 模拟残差计算
+ 885	
+ 884	                            break
+ 883	                        if self.should_stop:
+ 882	
+ 881	                                break
+ 880	                            if self.should_stop:
+ 879	                            self.msleep(100)
+ 878	                        while self.is_paused:
+ 877	
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 39 页]
+
+ 876	                            break
+ 875	                        if self.should_stop:
+ 874	                    for iteration in range(100):  # 占位符迭代次数
+ 873	                    # 由于求解器的实际实现可能不同，这里提供一个框架
+ 872	                    # 这里调用求解器的实际运行方法
+ 871	
+ 870	                    self.progress.emit("开始稳态仿真计算...")
+ 869	                try:
+ 868	            def run(self):
+ 867	
+ 866	                self.is_paused = False
+ 865	                self.should_stop = False
+ 864	                self.solver = solver
+ 863	                super().__init__()
+ 862	            def __init__(self, solver):
+ 861	
+ 860	            finished = Signal(bool, str)
+ 859	            residual_update = Signal(dict)
+ 858	            progress = Signal(str)
+ 857	        class SimulationThread(QThread):
+ 856	
+ 855	        from PySide6.QtCore import QThread, Signal
+ 854	        """在后台线程中运行求解器"""
+ 853	    def _run_solver_in_background(self):
+ 852	
+ 851	            self.update_simulation_button_states()
+ 850	            self.simulation_state = 'idle'
+ 849	            self.log_message(f"创建求解器失败: {str(e)}")
+ 848	        except Exception as e:
+ 847	
+ 846	            self._run_solver_in_background()
+ 845	            # 在后台线程中运行求解器
+ 844	
+ 843	            self.solver_instance = Solver(vtm_file, device=device, debug_mode=self.debug_logging_enabled)
+ 842	            device = 'gpu' if self._check_gpu_available() else 'cpu'
+ 841	            # 创建求解器
+ 840	
+ 839	                return
+ 838	                self.update_simulation_button_states()
+ 837	                self.simulation_state = 'idle'
+ 836	                self.log_message("错误: 找不到网格文件，无法启动求解器")
+ 835	            if not vtm_file or not os.path.exists(vtm_file):
+ 834	
+ 833	            vtm_file = self._get_vtm_file_path()
+ 832	            # 暂时使用占位符，实际使用时需要从界面获取或生成网格文件
+ 831	            # 创建求解器实例（这里需要实际的网格文件路径）
+ 830	
+ 829	            config['simulation_control']['convergence_criterion'] = residual_tolerance
+ 828	            config['simulation_control']['max_iterations'] = max_iterations
+ 827	            config = solver_config.get_config()
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 40 页]
+
+ 826	            # 更新求解器配置
+ 825	
+ 824	            residual_tolerance = float(self.ui.le_residual_tolerance.text())
+ 823	            max_iterations = int(self.ui.le_max_iterations.text())
+ 822	            # 获取配置参数
+ 821	
+ 820	            from 求解器 import solver_config
+ 819	            from 求解器.solver.solver import Solver
+ 818	            # 导入求解器
+ 817	        try:
+ 816	        """创建并运行求解器"""
+ 815	    def _create_and_run_solver(self):
+ 814	
+ 813	        self.update_simulation_button_states()
+ 812	
+ 811	            self.solver_instance = None
+ 810	            # 这里可以添加清理逻辑
+ 809	        if self.solver_instance:
+ 808	
+ 807	        self.log_message("仿真已停止")
+ 806	        self.simulation_state = 'stopped'
+ 805	        """停止仿真"""
+ 804	    def stop_simulation(self):
+ 803	
+ 802	            self.update_simulation_button_states()
+ 801	            self.log_message("仿真已暂停")
+ 800	            self.simulation_state = 'paused'
+ 799	        if self.simulation_state == 'running':
+ 798	        """暂停仿真"""
+ 797	    def pause_simulation(self):
+ 796	
+ 795	            self.update_simulation_button_states()
+ 794	            self.simulation_state = 'idle'
+ 793	            self.log_message(f"启动仿真失败: {str(e)}")
+ 792	        except Exception as e:
+ 791	
+ 790	            self._create_and_run_solver()
+ 789	            # 创建并启动求解器
+ 788	
+ 787	            self.residual_history = {key: [] for key in self.residual_history.keys()}
+ 786	            # 重置残差历史
+ 785	
+ 784	            self.update_simulation_button_states()
+ 783	            self.simulation_state = 'running'
+ 782	            self.log_message("开始启动CFD仿真...")
+ 781	        try:
+ 780	
+ 779	            return
+ 778	            self.log_message("错误: 仿真条件不满足，请确保已生成网格、风扇和边界条件")
+ 777	        if not self._check_simulation_readiness():
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 41 页]
+
+ 776	        """开始仿真"""
+ 775	    def start_simulation(self):
+ 774	
+ 773	        self.log_message("注意：这可能导致仿真失败，请确保已准备好所有条件")
+ 772	        self.log_message("警告: 仿真按钮已强制启用（调试模式）")
+ 771	        self.ui.sim_stop_action.setEnabled(True)
+ 770	        self.ui.sim_pause_action.setEnabled(True)
+ 769	        self.ui.sim_run_action.setEnabled(True)
+ 768	        """强制启用仿真按钮（调试用）"""
+ 767	    def force_enable_simulation(self):
+ 766	
+ 765	            self.log_message(f"{key}: {value}")
+ 764	        for key, value in status_info.items():
+ 763	        self.log_message("=== 详细仿真状态 ===")
+ 762	
+ 761	        }
+ 760	            "仿真状态": self.simulation_state
+ 759	            "收敛判据": self.ui.le_residual_tolerance.text(),
+ 758	            "最大迭代次数": self.ui.le_max_iterations.text(),
+ 757	            "边界条件数量": len(self.boundary_face_actors),
+ 756	            "风扇状态": "存在" if self.fan_actor else "不存在",
+ 755	            "网格数量": len(self.grid_actors),
+ 754	        status_info = {
+ 753	        """显示详细的仿真状态信息（调试用）"""
+ 752	    def show_simulation_status(self):
+ 751	
+ 750	        return has_grid and has_fans and has_boundary
+ 749	
+ 748	            self.log_message(f"  - 边界条件: {'存在' if has_boundary else '不存在'} (数量: {len(self.boundary_face_actors)})")
+ 747	            self.log_message(f"  - 风扇: {'存在' if has_fans else '不存在'}")
+ 746	            self.log_message(f"  - 网格: {'存在' if has_grid else '不存在'} (数量: {len(self.grid_actors)})")
+ 745	            self.log_message(f"仿真状态检查:")
+ 744	        if self.debug_logging_enabled:
+ 743	        # 添加详细的状态检查日志
+ 742	
+ 741	        has_boundary = bool(self.boundary_face_actors)
+ 740	        has_fans = bool(self.fan_actor)
+ 739	        has_grid = bool(self.grid_actors)
+ 738	        """检查仿真是否准备就绪"""
+ 737	    def _check_simulation_readiness(self):
+ 736	
+ 735	        self.ui.status_label.setText(status_messages.get(self.simulation_state, '状态: 未知'))
+ 734	        }
+ 733	            'stopped': '状态: 仿真已停止'
+ 732	            'paused': '状态: 仿真已暂停',
+ 731	            'running': '状态: 仿真运行中...',
+ 730	            'idle': '状态: 就绪' if self._check_simulation_readiness() else '状态: 等待网格/风扇/边界条件',
+ 729	        status_messages = {
+ 728	        """更新状态显示"""
+ 727	    def update_status_display(self):
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 42 页]
+
+ 726	
+ 725	        self.update_status_display()
+ 724	        # 更新状态标签
+ 723	
+ 722	            self.ui.sim_stop_action.setEnabled(False)
+ 721	            self.ui.sim_pause_action.setEnabled(False)
+ 720	            self.ui.sim_run_action.setEnabled(can_run)
+ 719	        elif self.simulation_state == 'stopped':
+ 718	            self.ui.sim_stop_action.setEnabled(True)
+ 717	            self.ui.sim_pause_action.setEnabled(False)
+ 716	            self.ui.sim_run_action.setEnabled(True)
+ 715	        elif self.simulation_state == 'paused':
+ 714	            self.ui.sim_stop_action.setEnabled(True)
+ 713	            self.ui.sim_pause_action.setEnabled(True)
+ 712	            self.ui.sim_run_action.setEnabled(False)
+ 711	        elif self.simulation_state == 'running':
+ 710	            self.ui.sim_stop_action.setEnabled(False)
+ 709	            self.ui.sim_pause_action.setEnabled(False)
+ 708	            self.ui.sim_run_action.setEnabled(can_run)
+ 707	        if self.simulation_state == 'idle':
+ 706	
+ 705	        can_run = has_grid and has_fans and has_boundary and has_valid_settings
+ 704	        # 所有条件都满足时才能运行仿真
+ 703	
+ 702	            has_valid_settings = False
+ 701	        except (ValueError, AttributeError):
+ 700	            has_valid_settings = max_iterations > 0 and residual_tolerance > 0
+ 699	            residual_tolerance = float(self.ui.le_residual_tolerance.text())
+ 698	            max_iterations = int(self.ui.le_max_iterations.text())
+ 697	        try:
+ 696	        # 检查仿真设置是否有效
+ 695	
+ 694	        has_boundary = bool(self.boundary_face_actors)  # 检查是否有边界条件
+ 693	        has_fans = bool(self.fan_actor)    # 检查是否有风扇
+ 692	        has_grid = bool(self.grid_actors)  # 检查是否有网格
+ 691	        """更新仿真按钮的启用/禁用状态"""
+ 690	    def update_simulation_button_states(self):
+ 689	
+ 688	        self.update_simulation_button_states()
+ 687	        # 更新按钮状态
+ 686	
+ 685	        self.setup_residual_plot()
+ 684	        # 初始化残差监控图表
+ 683	
+ 682	        self.ui.sim_stop_action.triggered.connect(self.stop_simulation)
+ 681	        self.ui.sim_pause_action.triggered.connect(self.pause_simulation)
+ 680	        self.ui.sim_run_action.triggered.connect(self.start_simulation)
+ 679	        """设置仿真控制按钮的信号连接"""
+ 678	    def setup_simulation_controls(self):
+ 677	
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 43 页]
+
+ 676	    # ================ 仿真控制功能 ================
+ 675	
+ 674	                print(f"[{datetime.now().strftime('%H:%M:%S')}][DEBUG] CSV生成错误: {e}")
+ 673	            if self.debug_logging_enabled:
+ 672	            self.log_message(f"生成CSV文件失败: {str(e)}")
+ 671	        except Exception as e:
+ 670	
+ 669	            # self._offer_open_directory(csv_path)
+ 668	            # CSV文件已静默保存，不再弹出提示
+ 667	
+ 666	            print(f"文件包含 {len(time_points)} 个时间点，{rpm_data.shape[1] * rpm_data.shape[2]} 个风扇的数据")
+ 665	            print(f"\n时间序列数据CSV文件已保存: {csv_path}")
+ 664	            self.log_message(f"CSV文件已生成: {csv_path}")
+ 663	
+ 662	                    writer.writerow(row)
+ 661	                    row = [f"{time_point:.3f}"] + [str(int(rpm)) for rpm in flat_rpm_data]
+ 660	                    flat_rpm_data = rpm_data[time_idx].flatten()
+ 659	                    # 展平2D风扇数据为1D数组
+ 658	                for time_idx, time_point in enumerate(time_points):
+ 657	                # 写入数据
+ 656	
+ 655	                writer.writerow(['Time(s)'] + [f'Fan_{i}' for i in range(rpm_data.shape[1] * rpm_data.shape[2])])
+ 654	                # 写入列标题
+ 653	
+ 652	                writer.writerow([])
+ 651	                writer.writerow([f'# 网格形状: {rpm_data.shape[1]}x{rpm_data.shape[2]}'])
+ 650	                writer.writerow([f'# 时间点数量: {len(time_points)}'])
+ 649	                writer.writerow([f'# 时间分辨率: {time_resolution} s'])
+ 648	                writer.writerow([f'# 最大转速: {max_rpm} RPM'])
+ 647	                writer.writerow([f'# 描述: {metadata.get("description", "No description")}'])
+ 646	                writer.writerow([f'# 数据来源: {metadata.get("generated_by", "Unknown")}'])
+ 645	                writer.writerow([f'# 生成时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'])
+ 644	                writer.writerow(['# 时间序列风扇转速数据'])
+ 643	                # 写入元数据头部
+ 642	
+ 641	                writer = csv.writer(csvfile)
+ 640	            with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+ 639	        try:
+ 638	
+ 637	        csv_path = os.path.join(csv_save_dir, csv_filename)
+ 636	
+ 635	        os.makedirs(csv_save_dir, exist_ok=True)
+ 634	        csv_save_dir = os.path.join(project_root, 'csv_outputs')
+ 633	        # 确保保存目录存在
+ 632	
+ 631	            project_root = os.path.dirname(os.path.dirname(current_file))
+ 630	        if not os.path.exists(os.path.join(project_root, 'main_app.py')):
+ 629	        # 如果没找到main_app.py，使用当前目录的上两级目录
+ 628	
+ 627	            project_root = os.path.dirname(project_root)
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 44 页]
+
+ 626	                break
+ 625	            if os.path.exists(os.path.join(project_root, 'main_app.py')):
+ 624	        while project_root != os.path.dirname(project_root):  # 直到到达文件系统根目录
+ 623	        project_root = current_dir
+ 622	        # 向上查找项目根目录
+ 621	
+ 620	        current_dir = os.path.dirname(current_file)
+ 619	        current_file = os.path.abspath(__file__)
+ 618	        # 从当前文件位置向上查找项目根目录（包含main_app.py的目录）
+ 617	        # 获取项目根目录
+ 616	
+ 615	        csv_filename = f"time_series_fan_data_{timestamp}.csv"
+ 614	        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+ 613	        # 创建文件名
+ 612	
+ 611	        from datetime import datetime
+ 610	        import os
+ 609	        import csv
+ 608	        """
+ 607	        生成时间序列数据的CSV文件
+ 606	        """
+ 605	    def generate_time_series_csv(self, time_points, rpm_data, metadata, max_rpm, time_resolution):
+ 604	
+ 603	                print(f"[{datetime.now().strftime('%H:%M:%S')}][DEBUG] 时间序列数据处理错误: {e}")
+ 602	            if self.debug_logging_enabled:
+ 601	            self.log_message(f"处理时间序列数据时出错: {str(e)}")
+ 600	        except Exception as e:
+ 599	
+ 598	                self.log_message(f"已加载第一个时间点的风扇RPM数据 (时间: {time_points[0]:.1f}s)")
+ 597	                self.receive_fan_rpm_array(first_time_point_rpm)
+ 596	            if first_time_point_rpm is not None:
+ 595	            first_time_point_rpm = rpm_data[0] if len(rpm_data) > 0 else None
+ 594	            # 同时生成第一个时间点的RPM数组用于预览
+ 593	
+ 592	            self.generate_time_series_csv(time_points, rpm_data, metadata, max_rpm, time_resolution)
+ 591	            # 生成CSV文件
+ 590	
+ 589	            time_resolution = time_series_data.get('time_resolution', 0.1)
+ 588	            max_rpm = time_series_data.get('max_rpm', 15000)
+ 587	            metadata = time_series_data['metadata']
+ 586	            rpm_data = time_series_data['rpm_data']  # shape: (time, rows, cols)
+ 585	            time_points = time_series_data['time_points']
+ 584	            # 提取关键信息
+ 583	
+ 582	            self.log_message("成功接收到时间序列数据")
+ 581	            self.time_series_data = time_series_data
+ 580	            # 存储数据
+ 579	
+ 578	                return
+ 577	                self.log_message("错误: 接收到的时间序列数据格式不正确")
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 45 页]
+
+ 576	            if not all(key in time_series_data for key in ['time_points', 'rpm_data', 'metadata']):
+ 575	            # 验证数据结构
+ 574	        try:
+ 573	        """
+ 572	        从风墙设置界面接收时间序列数据并生成CSV文件
+ 571	        """
+ 570	    def receive_time_series_data(self, time_series_data):
+ 569	
+ 568	                print(f"[{datetime.now().strftime('%H:%M:%S')}][DEBUG] 警告: 从主控程序接收到的风扇RPM数组无效或为空。")
+ 567	            if self.debug_logging_enabled:
+ 566	        else:
+ 565	
+ 564	            print("--------------------------------------------------------------------------------\n")
+ 563	
+ 562	                print(row_string) # 打印一整行
+ 561	                    row_string += f"[{fan_id}: {rpm:>5}] "
+ 560	                    # 格式化字符串，确保对齐
+ 559	                    rpm = rpm_array_to_print[r, c]
+ 558	                    fan_id = id_matrix[r][c]
+ 557	                for c in range(rpm_array_to_print.shape[1]):
+ 556	                row_string = ""
+ 555	            for r in range(rpm_array_to_print.shape[0]):
+ 554	            # 3. 遍历矩阵并格式化输出
+ 553	            
+ 552	            print("\n--- Verifying Received Fan RPM Matrix with IDs (Top-Down, Left-to-Right) ---")
+ 551	            
+ 550	            rpm_array_to_print = np.flipud(rpm_array)
+ 549	            # 2. 翻转RPM数组，使其打印顺序与ID矩阵和UI一致 (40x40, [0][0]是左上角)
+ 548	            
+ 547	            id_matrix = generate_fan_id_matrix()
+ 546	            # 1. 生成与UI布局一致的FanID矩阵 (40x40, [0][0]是左上角)
+ 545	            # --- 【核心修改】使用循环打印 FanID 和 RPM ---
+ 544	
+ 543	            self.ui.status_label.setText("状态: 已从主控加载风扇RPM数组")
+ 542	            self.log_message("成功从主控制程序接收到内存中的风扇RPM数组。")
+ 541	            self.fan_bc_content = None 
+ 540	            self.fan_rpm_array = rpm_array
+ 539	        if rpm_array is not None and rpm_array.shape == (40, 40):
+ 538	
+ 537	        from .fan_id_generator import generate_fan_id_matrix
+ 536	        # --- 【新增】导入 FanID 生成器 ---
+ 535	        """
+ 534	        接收后立即在控制台打印 FanID 和 RPM 矩阵以供验证。
+ 533	        从主控程序接收风扇RPM的NumPy数组并存储在内存中。
+ 532	        """
+ 531	    def receive_fan_rpm_array(self, rpm_array: np.ndarray):
+ 530	        # --- 新增: 用于接收内存数据的方法 ---
+ 529	                self.fan_bc_content = None
+ 528	                self.log_message(f"错误: 加载风扇BC文件失败 - {e}")
+ 527	            except Exception as e:
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 46 页]
+
+ 526	                self.log_message(f"成功加载风扇动态边界条件文件: {filename}")
+ 525	                    self.fan_bc_content = f.read()
+ 524	                with open(filename, 'r', encoding='utf-8') as f:
+ 523	            try:
+ 522	        if filename:
+ 521	        filename, _ = QFileDialog.getOpenFileName(self, "加载风扇动态边界条件文件", "", "CSV 文件 (*.csv);;所有文件 (*)")
+ 520	    def load_fan_bc_dialog(self):
+ 519	
+ 518	            self.ui.status_label.setText("状态: 保存已取消")
+ 517	                print(f"[{datetime.now().strftime('%H:%M:%S')}][DEBUG] 用户取消了保存操作，未生成任何文件。")
+ 516	            if self.debug_logging_enabled:
+ 515	        else:
+ 514	            file_handler.save_calculation_file(self, filename)
+ 513	                print(f"[{datetime.now().strftime('%H:%M:%S')}][DEBUG] 用户选择的文件路径: {filename}")
+ 512	            if self.debug_logging_enabled:
+ 511	        if filename:
+ 510	        
+ 509	        )
+ 508	            "VTK MultiBlock 文件 (*.vtm);;所有文件 (*)"
+ 507	            "project.vtm",
+ 506	            "保存计算文件", 
+ 505	            self, 
+ 504	        filename, _ = QFileDialog.getSaveFileName(
+ 503	    def save_calculation_file_dialog(self):
+ 502	
+ 501	            self.log_message(f"风扇ID表已导出至: {filename}")
+ 500	            fan_id_generator.save_id_matrix_to_csv(id_matrix, filename)
+ 499	            id_matrix = fan_id_generator.generate_fan_id_matrix()
+ 498	        if filename:
+ 497	        filename, _ = QFileDialog.getSaveFileName(self, "导出风扇ID表", "fan_id_matrix.csv", "CSV 文件 (*.csv);;所有文件 (*)")
+ 496	    def export_fan_id_table(self):
+ 495	
+ 494	            file_handler.load_parameters(self, filename)
+ 493	        if filename:
+ 492	        filename, _ = QFileDialog.getOpenFileName(self, "读取参数文件", "", "JSON 文件 (*.json);;所有文件 (*)")
+ 491	    def load_parameters_dialog(self):
+ 490	
+ 489	            file_handler.save_parameters(self, filename)
+ 488	        if filename:
+ 487	        filename, _ = QFileDialog.getSaveFileName(self, "保存参数文件", "", "JSON 文件 (*.json);;所有文件 (*)")
+ 486	    def save_parameters_dialog(self):
+ 485	            self.log_message(f"错误: 加载PQ曲线失败 - {e}")
+ 484	        except Exception as e:
+ 483	            self.log_message(f"成功加载并绘制PQ曲线: {filename}")
+ 482	
+ 481	            # self.ui.pq_graph_widget.setTitle('风扇PQ曲线') # 此行被注释掉
+ 480	            # 5. 移除标题
+ 479	            
+ 478	            self.ui.pq_graph_widget.showGrid(x=True, y=True)
+ 477	            self.ui.pq_graph_widget.setLabel('left', '静压 (Pa)'); self.ui.pq_graph_widget.setLabel('bottom', '流量 (m³/s)')
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 47 页]
+
+ 476	            # 4. 设置坐标轴标签和网格
+ 475	            
+ 474	            self.ui.pq_graph_widget.plot(flow_rate, pressure, pen=pg.mkPen('b', width=2))
+ 473	            # 3. 只用蓝色的线绘制，去掉点
+ 472	            
+ 471	            self.ui.pq_graph_widget.clear()
+ 470	            pressure = data[:, 0]; flow_rate = data[:, 1]
+ 469	            data = np.loadtxt(filename, comments='#', delimiter=',', encoding='utf-8')
+ 468	
+ 467	            self.ui.pq_graph_widget.getAxis('bottom').setTextPen(axis_pen)
+ 466	            self.ui.pq_graph_widget.getAxis('left').setTextPen(axis_pen)
+ 465	            self.ui.pq_graph_widget.getAxis('bottom').setPen(axis_pen)
+ 464	            self.ui.pq_graph_widget.getAxis('left').setPen(axis_pen)
+ 463	            axis_pen = pg.mkPen(color='k', width=1)
+ 462	            # 2. 获取坐标轴并设置颜色
+ 461	            
+ 460	            self.ui.pq_graph_widget.setBackground('w')
+ 459	            # 1. 设置背景为白色
+ 458	        try:
+ 457	    def load_pq_curve(self, filename):
+ 456	
+ 455	            self.load_pq_curve(filename)
+ 454	        if filename:
+ 453	        filename, _ = QFileDialog.getOpenFileName(self, "选择PQ曲线文件", "", "文本文件 (*.txt);;所有文件 (*)")
+ 452	    def select_and_load_pq_curve(self):
+ 451	
+ 450	                     print(f"[{datetime.now().strftime('%H:%M:%S')}][DEBUG] 已重新生成 {name} 边界。")
+ 449	                if self.debug_logging_enabled:
+ 448	                self.boundary_face_actors[name] = actor
+ 447	                actor = self.plotter.add_mesh(plane, color='grey', opacity=0.5)
+ 446	                plane = pv.PolyData(points, faces=faces)
+ 445	                points = face_corners[name]; faces = [4, 0, 1, 2, 3]
+ 444	            if checkbox.isChecked():
+ 443	        for name, checkbox in checkbox_map.items():
+ 442	        
+ 441	        }
+ 440	            'zp': self.ui.check_boundary_zp, 'zn': self.ui.check_boundary_zn,
+ 439	            'xp': self.ui.check_boundary_xp, 'xn': self.ui.check_boundary_xn, 'yp': self.ui.check_boundary_yp, 'yn': self.ui.check_boundary_yn,
+ 438	        checkbox_map = {
+ 437	        }
+ 436	            'zp': [[xmin, ymin, zmax], [xmax, ymin, zmax], [xmax, ymax, zmax], [xmin, ymax, zmax]], 'zn': [[xmin, ymin, zmin], [xmin, ymax, zmin], [xmax, ymax, zmin], [xmax, ymin, zmin]],
+ 435	            'yp': [[xmin, ymax, zmin], [xmax, ymax, zmin], [xmax, ymax, zmax], [xmin, ymax, zmax]], 'yn': [[xmin, ymin, zmax], [xmax, ymin, zmax], [xmax, ymin, zmin], [xmin, ymin, zmin]],
+ 434	            'xp': [[xmax, ymin, zmin], [xmax, ymax, zmin], [xmax, ymax, zmax], [xmax, ymin, zmax]], 'xn': [[xmin, ymin, zmax], [xmin, ymax, zmax], [xmin, ymax, zmin], [xmin, ymin, zmin]],
+ 433	        face_corners = {
+ 432	        xmin, xmax = bds['xmin'], bds['xmax']; ymin, ymax = bds['ymin'], bds['ymax']; zmin, zmax = bds['zmin'], bds['zmax']
+ 431	        bds = config.DOMAIN_BOUNDS
+ 430	
+ 429	                    print(f"[{datetime.now().strftime('%H:%M:%S')}][DEBUG] 已移除旧的 {name} 边界。")
+ 428	            if self.debug_logging_enabled:
+ 427	            del self.boundary_face_actors[name]
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 48 页]
+
+ 426	            self.plotter.remove_actor(actor)
+ 425	        for name, actor in list(self.boundary_face_actors.items()):
+ 424	
+ 423	        if not self._update_config_from_ui(): return
+ 422	    def update_boundary_faces(self):
+ 421	
+ 420	        self.plotter.reset_camera(); self.update_grid_visibility()
+ 419	        self.plotter.camera.SetPosition(position); self.plotter.camera.SetFocalPoint(center); self.plotter.camera.SetViewUp(view_up)
+ 418	        elif axis == 'z': position[2] += distance * (1 if negative else -1)
+ 417	        elif axis == 'y': position[1] += distance * (1 if negative else -1); view_up = [0.0, 0.0, -1.0]
+ 416	        if axis == 'x': position[0] += distance * (1 if negative else -1)
+ 415	        position = list(center); view_up = [0.0, 1.0, 0.0]
+ 414	        distance = np.linalg.norm(np.array(self.domain_box_mesh.bounds[1::2]) - np.array(self.domain_box_mesh.bounds[0::2])) * 1.5
+ 413	        center = self.domain_box_mesh.center
+ 412	            print(f"[{datetime.now().strftime('%H:%M:%S')}][DEBUG] 切换到 {axis} {'负' if negative else '正'}向视图。")
+ 411	        if self.debug_logging_enabled:
+ 410	    def set_view(self, axis, negative=False):
+ 409	    
+ 408	        self.plotter.render()
+ 407	                actor.visibility = 0
+ 406	            else:
+ 405	                dot_product = np.dot(view_vector, normals[name]); actor.visibility = int(dot_product >= 1e-6)
+ 404	            if self.is_grid_globally_visible:
+ 403	        for name, actor in self.grid_actors.items():
+ 402	        normals = {'xmax': np.array([1, 0, 0]), 'xmin': np.array([-1, 0, 0]), 'ymax': np.array([0, 1, 0]), 'ymin': np.array([0, -1, 0]), 'zmax': np.array([0, 0, 1]), 'zmin': np.array([0, 0, -1]),}
+ 401	        view_vector = domain_center - camera_pos
+ 400	        camera_pos = np.array(self.plotter.camera.position); domain_center = self.domain_box_mesh.center
+ 399	        if not self.grid_actors: return
+ 398	            print(f"[{datetime.now().strftime('%H:%M:%S')}][DEBUG] 正在更新网格可见性...")
+ 397	        if self.debug_logging_enabled:
+ 396	    def update_grid_visibility(self, *args):
+ 395	
+ 394	        self.update_grid_visibility()
+ 393	        self.log_message(f"网格显示已 {'开启' if self.is_grid_globally_visible else '关闭'}.")
+ 392	        self.is_grid_globally_visible = not self.is_grid_globally_visible
+ 391	        if not self.grid_actors: return
+ 390	    def toggle_grid_global_visibility(self):
+ 389	
+ 388	        self.log_message(f"风扇显示模式切换为: {log_text}"); self.plotter.render()
+ 387	            self.fan_actor.prop.style = 'surface'; log_text = "实体"; self.is_fan_style_surface = True
+ 386	        else:
+ 385	            self.fan_actor.prop.style = 'wireframe'; log_text = "线框"; self.is_fan_style_surface = False
+ 384	        if self.is_fan_style_surface:
+ 383	        if not self.fan_actor: return
+ 382	    def toggle_style(self):
+ 381	
+ 380	                print(f"[{datetime.now().strftime('%H:%M:%S')}][DEBUG] 切换为平行投影。")
+ 379	            if self.debug_logging_enabled:
+ 378	            self.plotter.enable_parallel_projection()
+ 377	        else:
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 49 页]
+
+ 376	                print(f"[{datetime.now().strftime('%H:%M:%S')}][DEBUG] 切换为透视投影。")
+ 375	            if self.debug_logging_enabled:
+ 374	            self.plotter.disable_parallel_projection()
+ 373	        if self.plotter.camera.parallel_projection:
+ 372	    def toggle_projection(self):
+ 371	
+ 370	        self.log_message(f"  - 最大网格尺寸 (dx,dy,dz): ({stats['max_size'][0]:.2f}, {stats['max_size'][1]:.2f}, {stats['max_size'][2]:.2f}) mm")
+ 369	        self.log_message(f"  - 最小网格尺寸 (dx,dy,dz): ({stats['min_size'][0]:.2f}, {stats['min_size'][1]:.2f}, {stats['min_size'][2]:.2f}) mm")
+ 368	        self.log_message(f"  - 总网格数: {stats['total_cells']:,}")
+ 367	        self.log_message("网格生成完毕。")
+ 366	        
+ 365	        self.update_grid_visibility()
+ 364	        self.update_button_states()
+ 363	        self.ui.status_label.setText("状态: 就绪")
+ 362	        
+ 361	                self.grid_actors[name] = actor
+ 360	                actor = self.plotter.add_mesh(mesh, color='black'); actor.visibility = False
+ 359	            if mesh.n_points > 0:
+ 358	        for name, mesh in grid_meshes.items():
+ 357	        self.grid_actors = {}
+ 356	        grid_meshes, stats = self.scene_generator.create_grid_geometry()
+ 355	        
+ 354	        QApplication.processEvents()
+ 353	        self.ui.status_label.setText("状态: 正在生成网格...")
+ 352	        
+ 351	            for actor in self.grid_actors.values(): self.plotter.remove_actor(actor)
+ 350	        if self.grid_actors:
+ 349	        if not self._update_config_from_ui(): return
+ 348	    def generate_grid(self):
+ 347	
+ 346	        self.log_message("风扇显示模式默认为: 线框")
+ 345	        self.log_message(f"成功生成 {config.FAN_ARRAY_SHAPE[0] * config.FAN_ARRAY_SHAPE[1]} 个风扇。")
+ 344	        self.update_button_states(is_generating=False)
+ 343	        self.ui.status_label.setText("状态: 就绪"); self.ui.progress_bar.setVisible(False)
+ 342	        self.plotter.reset_camera()
+ 341	        
+ 340	        self.is_fan_style_surface = False
+ 339	        self.fan_actor = self.plotter.add_mesh(combined_mesh, style='wireframe', color='lightblue', show_edges=True)
+ 338	        
+ 337	        QApplication.processEvents()
+ 336	        self.ui.status_label.setText("状态: 正在将模型添加到场景...")
+ 335	    def on_fan_generation_finished(self, combined_mesh):
+ 334	
+ 333	    def update_progress(self, value): self.ui.progress_bar.setValue(value)
+ 332	
+ 331	        self.fan_worker.start()
+ 330	        self.fan_worker.finished.connect(self.on_fan_generation_finished)
+ 329	        self.fan_worker.progress.connect(self.update_progress)
+ 328	        self.fan_worker = FanGeneratorWorker(self.scene_generator, self.cpu_cores)
+ 327	        
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 50 页]
+
+ 326	        self.ui.status_label.setText("状态: 正在生成风扇..."); self.ui.progress_bar.setValue(0); self.ui.progress_bar.setVisible(True)
+ 325	        self.update_button_states(is_generating=True)
+ 324	        if self.fan_actor: self.plotter.remove_actor(self.fan_actor); self.fan_actor = None
+ 323	        if not self._update_config_from_ui(): return
+ 322	    def start_fan_generation(self):
+ 321	
+ 320	        self.update_simulation_button_states()
+ 319	        # 更新仿真控制按钮状态
+ 318	
+ 317	        self.action_save_calc_file.setEnabled(grid_exist and not is_generating)
+ 316	        self.action_toggle_grid.setEnabled(grid_exist and not is_generating)
+ 315	        self.action_toggle_style.setEnabled(fans_exist and not is_generating)
+ 314	        self.action_generate_fans.setEnabled(not is_generating); self.action_generate_grid.setEnabled(not is_generating)
+ 313	        fans_exist = self.fan_actor is not None; grid_exist = bool(self.grid_actors)
+ 312	    def update_button_states(self, is_generating=False):
+ 311	
+ 310	        self.plotter.reset_camera(); self.update_grid_visibility()
+ 309	        self.plotter.camera.SetPosition(position); self.plotter.camera.SetFocalPoint(center); self.plotter.camera.SetViewUp(view_up)
+ 308	        view_up = (0.0, 1.0, 0.0)
+ 307	        position = (center[0] + distance, center[1], center[2] + distance)
+ 306	        distance = np.linalg.norm(np.array(self.domain_box_mesh.bounds[1::2]) - np.array(self.domain_box_mesh.bounds[0::2]))
+ 305	        center = self.domain_box_mesh.center
+ 304	    def reset_view_to_default(self):
+ 303	
+ 302	
+ 301	        self.log_message("残差监控图初始化完毕。")
+ 300	        }
+ 299	            'epsilon': self.ui.residual_plot_widget.plot(pen=(255, 165, 0), name='epsilon') # Orange
+ 298	            'k': self.ui.residual_plot_widget.plot(pen='m', name='k'),
+ 297	            'Continuity': self.ui.residual_plot_widget.plot(pen='c', name='Continuity'),
+ 296	            'Uz': self.ui.residual_plot_widget.plot(pen='b', name='Uz'),
+ 295	            'Uy': self.ui.residual_plot_widget.plot(pen='g', name='Uy'),
+ 294	            'Ux': self.ui.residual_plot_widget.plot(pen='r', name='Ux'),
+ 293	        self.residual_curves = {
+ 292	        # 为每条曲线创建空的PlotDataItem
+ 291	
+ 290	        self.ui.residual_plot_widget.addLegend()
+ 289	        self.ui.residual_plot_widget.setLogMode(y=True) # 设置Y轴为对数坐标
+ 288	        self.ui.residual_plot_widget.showGrid(x=True, y=True)
+ 287	        self.ui.residual_plot_widget.setLabel('bottom', 'Iteration', color='k')
+ 286	        self.ui.residual_plot_widget.setLabel('left', 'Residual', color='k')
+ 285	        self.ui.residual_plot_widget.setBackground('w')
+ 284	        # --- 新增: 初始化残差图 ---
+ 283	
+ 282	        self.plotter.iren.add_observer("EndInteractionEvent", self.update_grid_visibility)
+ 281	        self.log_message("3D场景初始化完毕，默认使用平行投影。")
+ 280	        self.plotter.enable_parallel_projection()
+ 279	        self.reset_view_to_default()
+ 278	        self.on_parameter_changed()
+ 277	        self.plotter.interactor.SetInteractorStyle(style)
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 51 页]
+
+ 276	        style = CustomInteractorStyle()
+ 275	        self.plotter.set_background('white')
+ 274	        self.plotter.add_axes()
+ 273	        # 初始化3D场景
+ 272	    def initialize_plotter(self):
+ 271	
+ 270	            return False
+ 269	                print(f"[{datetime.now().strftime('%H:%M:%S')}][DEBUG] 错误: 参数输入无效: {e}")
+ 268	            if self.debug_logging_enabled:
+ 267	            self.ui.status_label.setText(f"错误: 参数输入无效: {e}")
+ 266	        except (ValueError, IndexError) as e:
+ 265	            return True
+ 264	            # if self.ui.check_grounded.isChecked(): config.DOMAIN_BOUNDS['ymin'] = 0 # <-- 此行被删除
+ 263	            # 【核心修复】移除旧的、手动的 ymin 修改逻辑
+ 262	            
+ 261	            config.update_domain_bounds()
+ 260	            # 现在调用 update_domain_bounds() 会自动处理贴地逻辑
+ 259	            
+ 258	            config.STRETCH_RATIO_XY = float(self.ui.le_stretch_ratio_xy.text())
+ 257	            config.STRETCH_RATIO_Z = float(self.ui.le_stretch_ratio_z.text())
+ 256	            config.ENVIRONMENT_GRID_SIZE = (float(self.ui.le_env_grid_x.text()), float(self.ui.le_env_grid_y.text()), float(self.ui.le_env_grid_z.text()))
+ 255	            config.COMPONENT_GRID_CELLS = (int(self.ui.le_comp_grid_x.text()), int(self.ui.le_comp_grid_y.text()), int(self.ui.le_comp_grid_z.text()))
+ 254	            config.FAN_CIRCLE_SEGMENTS = int(self.ui.le_fan_circle_segments.text())
+ 253	            config.FAN_HUB_DIAMETER = float(self.ui.le_fan_hub_diameter.text())
+ 252	            config.FAN_HOLE_DIAMETER = float(self.ui.le_fan_hole_diameter.text())
+ 251	            config.FAN_THICKNESS = float(self.ui.le_fan_thickness.text())
+ 250	            config.FAN_WIDTH = float(self.ui.le_fan_width.text())
+ 249	            config.OUTLET_LENGTH = float(self.ui.le_outlet_length.text())
+ 248	            config.INLET_LENGTH = float(self.ui.le_inlet_length.text())
+ 247	                self.ui.le_margin_y.setEnabled(True)
+ 246	            else:
+ 245	                self.ui.le_margin_y.setEnabled(False)
+ 244	            if self.ui.check_grounded.isChecked():
+ 243	            # UI交互逻辑：如果贴地，则Y裕量输入框不可用
+ 242	            
+ 241	            config.MARGIN_Y = float(self.ui.le_margin_y.text())
+ 240	            config.MARGIN_X = float(self.ui.le_margin_x.text())
+ 239	            config.IS_GROUNDED = self.ui.check_grounded.isChecked()
+ 238	            # 【核心修复】首先更新 IS_GROUNDED 状态
+ 237	        try:
+ 236	    def _update_config_from_ui(self):
+ 235	
+ 234	            self.plotter.render()
+ 233	            self.update_boundary_faces()
+ 232	            self.log_message(f"计算域已更新。")
+ 231	            self.domain_box_actor = self.plotter.add_mesh(self.domain_box_mesh, style='wireframe', color='black', line_width=2)
+ 230	            self.domain_box_mesh = pv.Box(bounds=list(config.DOMAIN_BOUNDS.values()))
+ 229	            if self.domain_box_actor: self.plotter.remove_actor(self.domain_box_actor)
+ 228	        if self._update_config_from_ui():
+ 227	        print("参数已更改，正在更新计算域...")
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 52 页]
+
+ 226	    def on_parameter_changed(self):
+ 225	
+ 224	            self.log_message(f"并行核心数已设置为: {self.cpu_cores}")
+ 223	            self.cpu_cores = dialog.get_selected_cores()
+ 222	        if dialog.exec():
+ 221	        dialog = SettingsDialog(self, current_cores=self.cpu_cores)
+ 220	    def open_settings_dialog(self):
+ 219	
+ 218	        self.log_message(f"调试日志已 {'开启' if checked else '关闭'}.")
+ 217	        self.debug_logging_enabled = checked
+ 216	    def toggle_debug_logging(self, checked):
+ 215	        self.action_load_fan_bc.triggered.connect(self.load_fan_bc_dialog)
+ 214	        self.action_save_calc_file.triggered.connect(self.save_calculation_file_dialog)
+ 213	        self.action_export_fan_ids.triggered.connect(self.export_fan_id_table)
+ 212	        self.action_load_params.triggered.connect(self.load_parameters_dialog)
+ 211	        self.action_save_params.triggered.connect(self.save_parameters_dialog)
+ 210	        self.ui.btn_load_pq.clicked.connect(self.select_and_load_pq_curve)
+ 209	            checkbox.stateChanged.connect(self.on_parameter_changed)
+ 208	        for checkbox in self.ui.tab_global_params.findChildren(QCheckBox):
+ 207	            line_edit.editingFinished.connect(self.on_parameter_changed)
+ 206	        for line_edit in self.ui.tab_global_params.findChildren(QLineEdit):
+ 205	        self.action_force_enable.triggered.connect(self.force_enable_simulation)
+ 204	        self.action_show_status.triggered.connect(self.show_simulation_status)
+ 203	        self.action_toggle_debug_log.triggered.connect(self.toggle_debug_logging)
+ 202	        self.action_set_cores.triggered.connect(self.open_settings_dialog)
+ 201	        self.action_view_zp.triggered.connect(lambda: self.set_view('z')); self.action_view_zn.triggered.connect(lambda: self.set_view('z', negative=True))
+ 200	        self.action_view_yp.triggered.connect(lambda: self.set_view('y')); self.action_view_yn.triggered.connect(lambda: self.set_view('y', negative=True))
+ 199	        self.action_view_xp.triggered.connect(lambda: self.set_view('x')); self.action_view_xn.triggered.connect(lambda: self.set_view('x', negative=True))
+ 198	        self.action_toggle_grid.triggered.connect(self.toggle_grid_global_visibility); self.action_reset_view.triggered.connect(self.reset_view_to_default)
+ 197	        self.action_toggle_style.triggered.connect(self.toggle_style); self.action_toggle_projection.triggered.connect(self.toggle_projection)
+ 196	        self.action_generate_fans.triggered.connect(self.start_fan_generation); self.action_generate_grid.triggered.connect(self.generate_grid)
+ 195	    def connect_signals(self):
+ 194	
+ 193	        self.ui.le_stretch_ratio_xy.setText(str(config.STRETCH_RATIO_XY))
+ 192	        self.ui.le_stretch_ratio_z.setText(str(config.STRETCH_RATIO_Z))
+ 191	        self.load_pq_curve(config.DEFAULT_PQ_CURVE_FILE)
+ 190	        self.ui.le_rpm2.setText(str(config.FAN_RPM_2)); self.ui.check_dir2.setChecked(config.FAN_DIRECTION_2_IS_CW)
+ 189	        self.ui.le_rpm1.setText(str(config.FAN_RPM_1)); self.ui.check_dir1.setChecked(config.FAN_DIRECTION_1_IS_CW)
+ 188	        self.ui.le_env_grid_x.setText(str(config.ENVIRONMENT_GRID_SIZE[0])); self.ui.le_env_grid_y.setText(str(config.ENVIRONMENT_GRID_SIZE[1])); self.ui.le_env_grid_z.setText(str(config.ENVIRONMENT_GRID_SIZE[2]))
+ 187	        self.ui.le_comp_grid_x.setText(str(config.COMPONENT_GRID_CELLS[0])); self.ui.le_comp_grid_y.setText(str(config.COMPONENT_GRID_CELLS[1])); self.ui.le_comp_grid_z.setText(str(config.COMPONENT_GRID_CELLS[2]))
+ 186	        self.ui.le_fan_circle_segments.setText(str(config.FAN_CIRCLE_SEGMENTS))
+ 185	        self.ui.le_fan_hole_diameter.setText(str(config.FAN_HOLE_DIAMETER)); self.ui.le_fan_hub_diameter.setText(str(config.FAN_HUB_DIAMETER))
+ 184	        self.ui.le_fan_width.setText(str(config.FAN_WIDTH)); self.ui.le_fan_thickness.setText(str(config.FAN_THICKNESS))
+ 183	        self.ui.le_inlet_length.setText(str(config.INLET_LENGTH)); self.ui.le_outlet_length.setText(str(config.OUTLET_LENGTH))
+ 182	        self.ui.le_margin_x.setText(str(config.MARGIN_X)); self.ui.le_margin_y.setText(str(config.MARGIN_Y))
+ 181	    def load_parameters(self):
+ 180	
+ 179	        self.ui.log_output.append(f"[{timestamp}][INFO] {message}")
+ 178	        timestamp = datetime.now().strftime("%H:%M:%S")
+ 177	    def log_message(self, message):
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 53 页]
+
+ 176	
+ 175	        self.ui.toolbar.addAction(self.action_view_zn)
+ 174	        self.ui.toolbar.addAction(self.action_view_zp)
+ 173	        self.ui.toolbar.addAction(self.action_view_yn)
+ 172	        self.ui.toolbar.addAction(self.action_view_yp)
+ 171	        self.ui.toolbar.addAction(self.action_view_xn)
+ 170	        self.ui.toolbar.addAction(self.action_view_xp)
+ 169	        self.ui.toolbar.addAction(self.action_reset_view)
+ 168	
+ 167	        self.ui.toolbar.addSeparator()
+ 166	        self.ui.toolbar.addAction(self.action_toggle_grid)
+ 165	        self.ui.toolbar.addAction(self.action_toggle_projection)
+ 164	        self.ui.toolbar.addAction(self.action_toggle_style)
+ 163	
+ 162	        self.ui.toolbar.addSeparator()
+ 161	        self.ui.toolbar.addAction(self.action_generate_grid)
+ 160	        self.ui.toolbar.addAction(self.action_generate_fans)
+ 159	
+ 158	        self.ui.toolbar.addSeparator()
+ 157	        self.ui.toolbar.addAction(self.action_load_fan_bc)
+ 156	        self.ui.toolbar.addAction(self.action_save_calc_file)
+ 155	
+ 154	        self.ui.toolbar.addSeparator()
+ 153	        self.ui.toolbar.addAction(self.action_load_params)
+ 152	        self.ui.toolbar.addAction(self.action_save_params)
+ 151	        self.ui.menu_settings.addAction(self.action_force_enable)
+ 150	        self.ui.menu_settings.addAction(self.action_show_status)
+ 149	        self.ui.menu_settings.addSeparator()
+ 148	        self.ui.menu_settings.addAction(self.action_toggle_debug_log)
+ 147	        self.ui.menu_settings.addAction(self.action_set_cores)
+ 146	        self.ui.menu_file.addSeparator()
+ 145	        self.ui.menu_file.addAction(self.action_save_calc_file)
+ 144	        self.ui.menu_file.addAction(self.action_export_fan_ids)
+ 143	        self.ui.menu_file.addAction(self.action_load_fan_bc)
+ 142	        self.ui.menu_file.addSeparator()
+ 141	        self.ui.menu_file.addAction(self.action_load_params)
+ 140	        self.ui.menu_file.addAction(self.action_save_params)
+ 139	    def populate_toolbar_and_menu(self):
+ 138	
+ 137	        self.action_force_enable = QAction("强制启用仿真", self)
+ 136	        self.action_show_status = QAction("显示仿真状态", self)
+ 135	        self.action_toggle_debug_log = QAction("开启调试日志", self); self.action_toggle_debug_log.setCheckable(True); self.action_toggle_debug_log.setChecked(True)
+ 134	        self.action_load_fan_bc = QAction("加载风扇BC文件", self)
+ 133	        self.action_save_calc_file = QAction("保存计算文件", self)
+ 132	        self.action_export_fan_ids = QAction("导出风扇ID表", self)
+ 131	        self.action_load_params = QAction("读取参数", self)
+ 130	        self.action_set_cores = QAction("设置并行核心数...", self)
+ 129	        self.action_view_zp = QAction("View +Z", self); self.action_view_zn = QAction("View -Z", self)
+ 128	        self.action_view_yp = QAction("View +Y", self); self.action_view_yn = QAction("View -Y", self)
+ 127	        self.action_view_xp = QAction("View +X", self); self.action_view_xn = QAction("View -X", self)
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 54 页]
+
+ 126	        self.action_reset_view = QAction("恢复视图", self); self.action_reset_view.setShortcut("Home")
+ 125	        self.action_toggle_grid = QAction("切换网格", self); self.action_toggle_grid.setShortcut("G")
+ 124	        self.action_toggle_projection = QAction("切换投影", self)
+ 123	        self.action_toggle_style = QAction("切换显示", self); self.action_toggle_style.setShortcut("W")
+ 122	        self.action_generate_grid = QAction("生成网格", self)
+ 121	        self.action_generate_fans = QAction("生成风扇", self)
+ 120	        self.action_save_params = QAction("保存参数", self)
+ 119	    def create_actions(self):
+ 118	
+ 117	        self.setup_simulation_controls()
+ 116	        # 设置仿真控制
+ 115	
+ 114	        self.load_parameters(); self.connect_signals(); self.update_button_states(); self.initialize_plotter()
+ 113	        # 现在可以安全地调用update_button_states了
+ 112	
+ 111	        self.max_residual_points = 1000
+ 110	        self.residual_history = {'UX': [], 'UY': [], 'UZ': [], 'Continuity': [], 'k': [], 'epsilon': []}
+ 109	        self.simulation_thread = None
+ 108	        self.solver_instance = None
+ 107	        self.simulation_state = 'idle'  # idle, running, paused, stopped
+ 106	        # 仿真控制状态管理 - 必须在update_button_states之前初始化
+ 105	
+ 104	        self.fan_rpm_array = None
+ 103	        self.fan_bc_content = None
+ 102	        self.create_actions(); self.populate_toolbar_and_menu()
+ 101	        self.plotter = QtInteractor(self.ui.right_panel); self.ui.plotter_layout.addWidget(self.plotter.interactor)
+ 100	
+  99	        self.is_fan_style_surface = False
+  98	        self.debug_logging_enabled = True
+  97	        self.cpu_cores = max(1, cpu_count() - 2)
+  96	        self.boundary_face_actors = {}
+  95	        self.scene_generator = SceneGenerator(); self.domain_box_actor = None
+  94	        self.fan_actor = None; self.grid_actors = {}; self.is_grid_globally_visible = False
+  93	        self.ui = Ui_MainWindow(); self.ui.setupUi(self)
+  92	        super().__init__(parent)
+  91	    def __init__(self, parent=None):
+  90	    # ... (此类及以下所有函数均无变化) ...
+  89	class MainWindow(QMainWindow):
+  88	
+  87	    def get_selected_cores(self): return int(self.combo_cpu_count.currentText())
+  86	        layout.addWidget(buttons)
+  85	        buttons.accepted.connect(self.accept); buttons.rejected.connect(self.reject)
+  84	        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+  83	        form_layout.addRow("并行核心数:", self.combo_cpu_count); layout.addLayout(form_layout)
+  82	        else: self.combo_cpu_count.setCurrentText(str(max(1, max_cores - 2)))
+  81	        if current_cores and current_cores <= max_cores: self.combo_cpu_count.setCurrentText(str(current_cores))
+  80	        for i in range(1, max_cores + 1): self.combo_cpu_count.addItem(str(i))
+  79	        form_layout = QFormLayout(); self.combo_cpu_count = QComboBox(); max_cores = cpu_count()
+  78	        super().__init__(parent); self.setWindowTitle("设置"); layout = QVBoxLayout(self)
+  77	    def __init__(self, parent=None, current_cores=None):
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 55 页]
+
+  76	    # ... (此类无变化) ...
+  75	class SettingsDialog(QDialog):
+  74	
+  73	
+  72	
+  71	        print(f"[{datetime.now().strftime('%H:%M:%S')}] [Worker] {message}")
+  70	    def log(self, message):
+  69	            self.finished.emit(None)
+  68	            self.log(f"详细追溯信息:\n{traceback.format_exc()}")
+  67	            self.log(f"错误: 风扇生成过程中发生异常: {e}")
+  66	            import traceback
+  65	        except Exception as e:
+  64	            self.finished.emit(combined_mesh)
+  63	            # 3. 发送完成信号
+  62	            
+  61	            self.log(f"风扇阵列几何体生成完毕。总耗时: {end_time - start_time:.2f} 秒。")
+  60	            end_time = time.time()
+  59	            
+  58	            combined_mesh = next(generator)
+  57	            # 2. 获取最终的 "Mega-Mesh" MultiBlock 对象
+  56	            
+  55	            )
+  54	                self.progress.emit
+  53	            generator = self.scene_generator.create_fan_array_generator(
+  52	            # 1. 调用最终优化版的生成器 (不再需要传入 cpu_cores)
+  51	        try:
+  50	        
+  49	        self.progress.emit(5)
+  48	        self.log("开始使用向量化方法生成风扇阵列...")
+  47	        
+  46	        start_time = time.time()
+  45	    def run(self):
+  44	        self.cpu_cores = cpu_cores 
+  43	        # self.cpu_cores is no longer used but kept for API consistency for now
+  42	        self.scene_generator = scene_generator
+  41	        super().__init__()
+  40	    def __init__(self, scene_generator, cpu_cores):
+  39	    finished = Signal(object)
+  38	    progress = Signal(int)
+  37	class FanGeneratorWorker(QThread):
+  36	
+  35	# ... (文件顶部的其他导入) ...
+  34	
+  33	# pre_processor_window.py
+  32	# --- 决定性修复: 采用最终的、健壮的面片合并逻辑 ---
+  31	
+  30	    def right_button_release_event(self, obj, event): self.EndPan()
+  29	    def right_button_press_event(self, obj, event): self.StartPan()
+  28	    def middle_button_release_event(self, obj, event): pass
+  27	    def middle_button_press_event(self, obj, event): pass
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\pre_processor_window.py
+--------------------------------------------------------------------------------
+[第 56 页]
+
+  26	        super().__init__(); self.AddObserver("MiddleButtonPressEvent", self.middle_button_press_event); self.AddObserver("MiddleButtonReleaseEvent", self.middle_button_release_event); self.AddObserver("RightButtonPressEvent", self.right_button_press_event); self.AddObserver("RightButtonReleaseEvent", self.right_button_release_event)
+  25	    def __init__(self, parent=None):
+  24	    # ... (此类无变化) ...
+  23	class CustomInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
+  22	
+  21	from . import fan_id_generator
+  20	from . import file_handler
+  19	from .scene_generator import SceneGenerator
+  18	from . import pre_processor_config as config
+  17	from .ui_main_window import Ui_MainWindow
+  16	import pyqtgraph as pg
+  15	import time
+  14	from datetime import datetime
+  13	from multiprocessing import Pool, cpu_count, freeze_support
+  12	from pyvistaqt import QtInteractor
+  11	import pyvista as pv
+  10	from PySide6.QtCore import QThread, Signal
+   9	from PySide6.QtGui import QAction
+   8	                               QPushButton, QLabel, QDialogButtonBox, QFormLayout)
+   7	                               QFileDialog, QDialog, QVBoxLayout, QComboBox,
+   6	from PySide6.QtWidgets import (QMainWindow, QApplication, QLineEdit, QCheckBox,
+   5	import os
+   4	import vtk
+   3	import numpy as np
+   2	
+   1	# main_window.py
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\file_handler.py
+--------------------------------------------------------------------------------
+[第 56 页]
+
+ 226	
+ 225	        main_window.log_message(f"【严重】详细追溯信息:\n{traceback.format_exc()}")
+ 224	        main_window.log_message(f"错误: 在 project_data.save() 过程中发生异常: {e}")
+ 223	        import traceback
+ 222	    except Exception as e:
+ 221	        main_window.log_message(f"计算文件已成功保存至: {filename}")
+ 220	        main_window.log_message(f"project_data.save() 调用执行完毕。")
+ 219	        project_data.save(filename, binary=True)
+ 218	        main_window.log_message(f"准备调用 project_data.save()。")
+ 217	        abs_path = os.path.abspath(filename)
+ 216	    try:
+ 215	
+ 214	    project_data.field_data["length_unit"] = np.array(["meters"])
+ 213	    project_data.field_data["generation_timestamp"] = np.array([timestamp])
+ 212	
+ 211	        main_window.log_message("警告: 未找到任何风扇转速数据。")
+ 210	    else:
+ 209	        main_window.log_message("风扇动态边界条件(CSV)已作为元数据添加。")
+ 208	        project_data.field_data["fan_boundary_conditions.csv"] = np.array([main_window.fan_bc_content])
+ 207	    elif hasattr(main_window, 'fan_bc_content') and main_window.fan_bc_content:
+ 206	        main_window.log_message("稳态风扇RPM数组(NumPy)已作为元数据添加。")
+ 205	        project_data.field_data["fan_rpm_array"] = main_window.fan_rpm_array
+ 204	    if hasattr(main_window, 'fan_rpm_array') and main_window.fan_rpm_array is not None:
+ 203	    # 7. 添加风扇转速数据
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\file_handler.py
+--------------------------------------------------------------------------------
+[第 57 页]
+
+ 202	
+ 201	        main_window.log_message("使用默认PQ曲线数据。")
+ 200	        project_data.field_data["pq_curve.csv"] = np.array([default_pq_data])
+ 199	        default_pq_data = "Pressure_Pa,FlowRate_m3s\n0,0\n100,0.1\n200,0.05"
+ 198	        # 提供默认的PQ曲线数据
+ 197	        main_window.log_message(f"错误: PQ曲线数据获取失败 - {e}")
+ 196	    except Exception as e:
+ 195	            main_window.log_message("警告: 未找到PQ曲线数据。")
+ 194	        else:
+ 193	                main_window.log_message("警告: PQ曲线数据为空。")
+ 192	            else:
+ 191	                main_window.log_message("PQ曲线数据已作为元数据添加。")
+ 190	                project_data.field_data["pq_curve.csv"] = np.array([pq_string_io.getvalue()])
+ 189	                for p, q in zip(pressure, flow_rate): pq_writer.writerow([p, q])
+ 188	                pq_writer.writerow(['Pressure_Pa', 'FlowRate_m3s'])
+ 187	                pq_writer = csv.writer(pq_string_io)
+ 186	                pq_string_io = StringIO()
+ 185	            if flow_rate is not None and pressure is not None:
+ 184	            flow_rate, pressure = pq_curve_data_item.getData()
+ 183	            pq_curve_data_item = plot_items[0]
+ 182	        if plot_items:
+ 181	        plot_items = main_window.ui.pq_graph_widget.getPlotItem().listDataItems()
+ 180	    try:
+ 179	    # 6. 添加PQ曲线 (pq_curve.csv)
+ 178	
+ 177	        main_window.log_message("使用默认风扇ID矩阵。")
+ 176	        project_data.field_data["fan_id_matrix.csv"] = np.array([string_io.getvalue()])
+ 175	        csv_writer.writerows(default_id_matrix)
+ 174	        csv_writer = csv.writer(string_io)
+ 173	        string_io = StringIO()
+ 172	        default_id_matrix = [[0, 0], [0, 0]]
+ 171	        # 提供一个最小的默认ID矩阵
+ 170	        main_window.log_message(f"错误: 风扇ID矩阵生成失败 - {e}")
+ 169	    except Exception as e:
+ 168	        main_window.log_message("风扇ID矩阵已作为元数据添加。")
+ 167	        project_data.field_data["fan_id_matrix.csv"] = np.array([string_io.getvalue()])
+ 166	        csv_writer.writerows(id_matrix)
+ 165	        csv_writer = csv.writer(string_io)
+ 164	        string_io = StringIO()
+ 163	        id_matrix = generate_fan_id_matrix()
+ 162	    try:
+ 161	    # 5. 添加风扇ID矩阵 (fan_id_matrix.csv)
+ 160	
+ 159	    main_window.log_message("边界条件(示例)已作为元数据添加。")
+ 158	    project_data.field_data["boundary_conditions.json"] = np.array([json.dumps(bc_dict, indent=4)])
+ 157	    }
+ 156	      "z_min": {"type": "wall", "value": "no_slip"}, "z_max": {"type": "wall", "value": "no_slip"}
+ 155	      "y_min": {"type": "wall", "value": "no_slip"}, "y_max": {"type": "wall", "value": "no_slip"},
+ 154	      "x_min": {"type": "inlet", "value": [10.0, 0, 0]}, "x_max": {"type": "outlet", "value": 0.0},
+ 153	    bc_dict = {
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\file_handler.py
+--------------------------------------------------------------------------------
+[第 58 页]
+
+ 152	    # 4. 添加边界条件 (boundary_conditions.json)
+ 151	
+ 150	    main_window.log_message("全局参数已作为元数据添加。")
+ 149	    project_data.field_data["parameters.json"] = np.array([json.dumps(params_dict, indent=4)])
+ 148	        params_dict['AIR_TEMPERATURE_C'] = 25.0; params_dict['AIR_HUMIDITY_RH'] = 50.0; params_dict['AMBIENT_PRESSURE_PA'] = 0.0
+ 147	    except ValueError:
+ 146	        params_dict['AMBIENT_PRESSURE_PA'] = float(main_window.ui.le_ambient_pressure.text())
+ 145	        params_dict['AIR_HUMIDITY_RH'] = float(main_window.ui.le_air_humidity.text())
+ 144	        params_dict['AIR_TEMPERATURE_C'] = float(main_window.ui.le_air_temp.text())
+ 143	    try:
+ 142	    params_dict = {k: v for k, v in config.__dict__.items() if not k.startswith('__') and isinstance(v, (int, float, str, bool, tuple, list, dict))}
+ 141	    # 3. 添加全局参数 (parameters.json)
+ 140	
+ 139	        main_window.log_message("使用默认网格坐标。")
+ 138	        project_data.field_data["grid_z_coords"] = z_coords
+ 137	        project_data.field_data["grid_y_coords"] = y_coords
+ 136	        project_data.field_data["grid_x_coords"] = x_coords
+ 135	        z_coords = np.linspace(0, 1, 11)
+ 134	        y_coords = np.linspace(0, 1, 11)
+ 133	        x_coords = np.linspace(0, 1, 11)
+ 132	        # 提供默认坐标
+ 131	        main_window.log_message(f"错误: 网格坐标计算失败 - {e}")
+ 130	    except Exception as e:
+ 129	        main_window.log_message("网格坐标已作为元数据添加。")
+ 128	        project_data.field_data["grid_z_coords"] = z_coords
+ 127	        project_data.field_data["grid_y_coords"] = y_coords
+ 126	        project_data.field_data["grid_x_coords"] = x_coords
+ 125	        x_coords, y_coords, z_coords, _ = main_window.scene_generator._calculate_grid_coords()
+ 124	    try:
+ 123	    main_window.log_message(f"正在计算网格坐标...")
+ 122	    # 2. 添加网格坐标
+ 121	    
+ 120	        main_window.log_message("警告: 未找到风扇几何体。")
+ 119	    else:
+ 118	        main_window.log_message("风扇几何体已(转换为米)并添加到项目。")
+ 117	        project_data["Geometry"] = geom_block
+ 116	        geom_block["FanHub"] = fan_multiblock["hub"]
+ 115	        geom_block["FanFrame"] = fan_multiblock["frame"]
+ 114	                block.points /= 1000.0
+ 113	            if block is not None:
+ 112	        for block in fan_multiblock:
+ 111	        main_window.log_message(f"正在转换几何体单位 (除以1000)...")
+ 110	        fan_multiblock = main_window.fan_actor.mapper.dataset.copy()
+ 109	        geom_block = pv.MultiBlock()
+ 108	    if main_window.fan_actor:
+ 107	    # 1. 添加几何数据
+ 106	
+ 105	    main_window.log_message(f"PyVista MultiBlock 对象已创建。")
+ 104	    project_data = pv.MultiBlock()
+ 103	    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\file_handler.py
+--------------------------------------------------------------------------------
+[第 59 页]
+
+ 102	
+ 101	    main_window.log_message(f"开始构建计算文件...")
+ 100	    main_window.log_message(f"接收到的文件名: {filename}")
+  99	    main_window.log_message(f"进入 file_handler.save_calculation_file 函数。")
+  98	
+  97	    from .fan_id_generator import generate_fan_id_matrix
+  96	    from . import pre_processor_config as config
+  95	    import datetime
+  94	    import csv
+  93	    from io import StringIO
+  92	    import pyvista as pv
+  91	    import numpy as np
+  90	    import json
+  89	    import os
+  88	    # --- 【关键修复】将所有需要的导入都放在函数顶部 ---
+  87	def save_calculation_file(main_window, filename):
+  86	
+  85	    main_window.on_parameter_changed()
+  84	    # 触发UI更新
+  83	    main_window.log_message(f"参数已从 {filename} 加载。")
+  82	    
+  81	    main_window.ui.check_dir2.setChecked(params.get("FAN_DIRECTION_2_IS_CW", False))
+  80	    main_window.ui.le_rpm2.setText(params.get("FAN_RPM_2", ""))
+  79	    main_window.ui.check_dir1.setChecked(params.get("FAN_DIRECTION_1_IS_CW", False))
+  78	    main_window.ui.le_rpm1.setText(params.get("FAN_RPM_1", ""))
+  77	    # 风扇参数
+  76	    main_window.ui.check_boundary_zn.setChecked(params.get("BOUNDARY_ZN", False))
+  75	    main_window.ui.check_boundary_zp.setChecked(params.get("BOUNDARY_ZP", False))
+  74	    main_window.ui.check_boundary_yn.setChecked(params.get("BOUNDARY_YN", False))
+  73	    main_window.ui.check_boundary_yp.setChecked(params.get("BOUNDARY_YP", False))
+  72	    main_window.ui.check_boundary_xn.setChecked(params.get("BOUNDARY_XN", False))
+  71	    main_window.ui.check_boundary_xp.setChecked(params.get("BOUNDARY_XP", False))
+  70	    # 边界封闭
+  69	    main_window.ui.le_env_grid_z.setText(params.get("ENVIRONMENT_GRID_SIZE_Z", ""))
+  68	    main_window.ui.le_env_grid_y.setText(params.get("ENVIRONMENT_GRID_SIZE_Y", ""))
+  67	    main_window.ui.le_env_grid_x.setText(params.get("ENVIRONMENT_GRID_SIZE_X", ""))
+  66	    main_window.ui.le_comp_grid_z.setText(params.get("COMPONENT_GRID_CELLS_Z", ""))
+  65	    main_window.ui.le_comp_grid_y.setText(params.get("COMPONENT_GRID_CELLS_Y", ""))
+  64	    main_window.ui.le_comp_grid_x.setText(params.get("COMPONENT_GRID_CELLS_X", ""))
+  63	    main_window.ui.check_grounded.setChecked(params.get("GROUNDED", False))
+  62	    main_window.ui.le_fan_circle_segments.setText(params.get("FAN_CIRCLE_SEGMENTS", ""))
+  61	    main_window.ui.le_fan_hub_diameter.setText(params.get("FAN_HUB_DIAMETER", ""))
+  60	    main_window.ui.le_fan_hole_diameter.setText(params.get("FAN_HOLE_DIAMETER", ""))
+  59	    main_window.ui.le_fan_thickness.setText(params.get("FAN_THICKNESS", ""))
+  58	    main_window.ui.le_fan_width.setText(params.get("FAN_WIDTH", ""))
+  57	    main_window.ui.le_outlet_length.setText(params.get("OUTLET_LENGTH", ""))
+  56	    main_window.ui.le_inlet_length.setText(params.get("INLET_LENGTH", ""))
+  55	    main_window.ui.le_margin_y.setText(params.get("MARGIN_Y", ""))
+  54	    main_window.ui.le_margin_x.setText(params.get("MARGIN_X", ""))
+  53	    # 全局参数
+
+
+--------------------------------------------------------------------------------
+文件：前处理\CFD_module\file_handler.py
+--------------------------------------------------------------------------------
+[第 60 页]
+
+  52	    
+  51	        params = json.load(f)
+  50	    with open(filename, 'r', encoding='utf-8') as f:
+  49	    """从JSON文件读取参数并更新UI"""
+  48	def load_parameters(main_window, filename):
+  47	
+  46	    main_window.log_message(f"参数已保存至: {filename}")
+  45	        json.dump(params, f, indent=4)
+  44	    with open(filename, 'w', encoding='utf-8') as f:
+  43	    }
+  42	        "FAN_DIRECTION_2_IS_CW": main_window.ui.check_dir2.isChecked(),
+  41	        "FAN_RPM_2": main_window.ui.le_rpm2.text(),
+  40	        "FAN_DIRECTION_1_IS_CW": main_window.ui.check_dir1.isChecked(),
+  39	        "FAN_RPM_1": main_window.ui.le_rpm1.text(),
+  38	        # 风扇参数
+  37	        "BOUNDARY_ZN": main_window.ui.check_boundary_zn.isChecked(),
+  36	        "BOUNDARY_ZP": main_window.ui.check_boundary_zp.isChecked(),
+  35	        "BOUNDARY_YN": main_window.ui.check_boundary_yn.isChecked(),
+  34	        "BOUNDARY_YP": main_window.ui.check_boundary_yp.isChecked(),
+  33	        "BOUNDARY_XN": main_window.ui.check_boundary_xn.isChecked(),
+  32	        "BOUNDARY_XP": main_window.ui.check_boundary_xp.isChecked(),
+  31	        # 边界封闭
+  30	        "ENVIRONMENT_GRID_SIZE_Z": main_window.ui.le_env_grid_z.text(),
+  29	        "ENVIRONMENT_GRID_SIZE_Y": main_window.ui.le_env_grid_y.text(),
+  28	        "ENVIRONMENT_GRID_SIZE_X": main_window.ui.le_env_grid_x.text(),
+  27	        "COMPONENT_GRID_CELLS_Z": main_window.ui.le_comp_grid_z.text(),
+  26	        "COMPONENT_GRID_CELLS_Y": main_window.ui.le_comp_grid_y.text(),
+  25	        "COMPONENT_GRID_CELLS_X": main_window.ui.le_comp_grid_x.text(),
+  24	        "GROUNDED": main_window.ui.check_grounded.isChecked(),
+  23	        "FAN_CIRCLE_SEGMENTS": main_window.ui.le_fan_circle_segments.text(),
+  22	        "FAN_HUB_DIAMETER": main_window.ui.le_fan_hub_diameter.text(),
+  21	        "FAN_HOLE_DIAMETER": main_window.ui.le_fan_hole_diameter.text(),
+  20	        "FAN_THICKNESS": main_window.ui.le_fan_thickness.text(),
+  19	        "FAN_WIDTH": main_window.ui.le_fan_width.text(),
+  18	        "OUTLET_LENGTH": main_window.ui.le_outlet_length.text(),
+  17	        "INLET_LENGTH": main_window.ui.le_inlet_length.text(),
+  16	        "MARGIN_Y": main_window.ui.le_margin_y.text(),
+  15	        "MARGIN_X": main_window.ui.le_margin_x.text(),
+  14	        # 全局参数
+  13	    params = {
+  12	    """从UI收集所有参数并保存为JSON文件"""
+  11	def save_parameters(main_window, filename):
+  10	
+   9	from .fan_id_generator import generate_fan_id_matrix, save_id_matrix_to_csv
+   8	import numpy as np
+   7	import pyvista as pv
+   6	import zipfile
+   5	import tempfile
+   4	import os
+   3	import json
+
+
+================================================================================
+                                    源代码文档结束                                     
+================================================================================
+
+总页数：60页（前30页 + 后30页）
+生成时间：2026年01月
+

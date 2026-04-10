@@ -21,6 +21,8 @@ import numpy as np
 import logging
 from datetime import datetime
 import os
+import csv
+import threading as threading_module
 
 # 协议配置
 PROTOCOL_CONFIG = {
@@ -145,6 +147,48 @@ class FanUDPSender:
             'last_send_time': None,
         }
 
+        # 数据记录目录
+        self.data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data')
+        os.makedirs(self.data_dir, exist_ok=True)
+
+        # 记录每个风扇的当前PWM值（用于记录变化）
+        # key: f"{ip}_{fan_id}", value: pwm_value
+        self.fan_pwm_states = {}
+        self.pwm_lock = threading_module.Lock()
+
+        # 风扇ID映射表：逻辑风扇ID -> 物理风扇ID
+        self.fan_id_mapping = {
+            0: 13,   # 0号风扇 -> 13号风扇
+            1: 9,    # 1号风扇 -> 9号风扇
+            2: 5,    # 2号风扇 -> 5号风扇
+            3: 1,    # 3号风扇 -> 1号风扇
+            4: 14,   # 4号风扇 -> 14号风扇
+            5: 10,   # 5号风扇 -> 10号风扇
+            6: 6,    # 6号风扇 -> 6号风扇
+            7: 2,    # 7号风扇 -> 2号风扇
+            8: 15,   # 8号风扇 -> 15号风扇
+            9: 11,   # 9号风扇 -> 11号风扇
+            10: 7,   # 10号风扇 -> 7号风扇
+            11: 3,   # 11号风扇 -> 3号风扇
+            12: 16,  # 12号风扇 -> 16号风扇
+            13: 12,  # 13号风扇 -> 12号风扇
+            14: 8,   # 14号风扇 -> 8号风扇
+            15: 4,   # 15号风扇 -> 4号风扇
+        }
+
+        # 反向映射表：物理风扇ID -> 逻辑风扇ID（用于批量数据包）
+        self.physical_to_logical_fan = {v: k for k, v in self.fan_id_mapping.items()}
+
+        # CSV文件锁和写入器
+        self.csv_lock = threading_module.Lock()
+        self.csv_writer = None
+        self.csv_file = None
+        self._init_csv_file()
+
+        # 原始数据TXT文件路径
+        self.raw_data_file = None
+        self._init_raw_data_file()
+
         # 打印初始化信息
         if self.enable_logging and self.logger:
             self.logger.info('=' * 60)
@@ -170,6 +214,173 @@ class FanUDPSender:
         last_octet = int(ip_parts[3]) + board_id
         return f"192.168.1.{last_octet}"
 
+    def _init_csv_file(self):
+        """初始化CSV文件，写入表头"""
+        try:
+            date_str = datetime.now().strftime('%Y%m%d')
+            csv_file = os.path.join(self.data_dir, f'fan_data_{date_str}.csv')
+
+            # 如果文件不存在，创建并写入表头
+            if not os.path.exists(csv_file):
+                with open(csv_file, 'w', newline='', encoding='utf-8') as f:
+                    writer = csv.writer(f)
+                    writer.writerow([
+                        '时间',
+                        'IP地址',
+                        '风扇ID',
+                        '链路ID',
+                        '板ID',
+                        '原PWM值',
+                        '新PWM值',
+                        '变化值'
+                    ])
+
+            self.csv_file = csv_file
+
+        except Exception as e:
+            if self.enable_logging and self.logger:
+                self.logger.warning(f"初始化CSV文件失败: {e}")
+
+    def _init_raw_data_file(self):
+        """初始化原始数据记录TXT文件"""
+        try:
+            date_str = datetime.now().strftime('%Y%m%d')
+            raw_data_file = os.path.join(self.data_dir, f'raw_data_{date_str}.txt')
+
+            # 如果文件不存在，创建并写入表头
+            if not os.path.exists(raw_data_file):
+                with open(raw_data_file, 'w', encoding='utf-8') as f:
+                    f.write("=" * 80 + "\n")
+                    f.write(f"风机通讯原始数据记录 - {date_str}\n")
+                    f.write("=" * 80 + "\n\n")
+
+            self.raw_data_file = raw_data_file
+
+        except Exception as e:
+            if self.enable_logging and self.logger:
+                self.logger.warning(f"初始化原始数据文件失败: {e}")
+
+    def _log_raw_data(self, ip: str, port: int, packet: bytes, packet_type: str):
+        """
+        记录发送给板子的原始数据包到TXT文件
+
+        Args:
+            ip: 目标IP地址
+            port: 目标端口
+            packet: 发送的数据包
+            packet_type: 数据包类型（single/bulk）
+        """
+        try:
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+
+            # 检查是否需要切换到新日期的文件
+            date_str = datetime.now().strftime('%Y%m%d')
+            expected_file = os.path.join(self.data_dir, f'raw_data_{date_str}.txt')
+
+            if self.raw_data_file != expected_file:
+                self._init_raw_data_file()
+                expected_file = self.raw_data_file
+
+            # 格式化数据包内容
+            hex_str = ' '.join(f'{b:02X}' for b in packet)
+            packet_length = len(packet)
+
+            # 构建记录内容
+            log_entry = f"""
+{'=' * 60}
+时间: {timestamp}
+类型: {packet_type}
+目标: {ip}:{port}
+长度: {packet_length} 字节
+数据包内容 (HEX):
+{hex_str}
+
+数据包详细解析:
+"""
+
+            # 解析数据包内容
+            if packet_type == 'single' and packet_length == 5:
+                log_entry += f"  链路ID: {packet[0]} (0x{packet[0]:02X})\n"
+                log_entry += f"  板ID:   {packet[1]} (0x{packet[1]:02X})\n"
+                log_entry += f"  风扇ID: {packet[2]} (0x{packet[2]:02X}) - 物理风扇编号\n"
+                pwm_low = packet[3]
+                pwm_high = packet[4]
+                pwm_value = pwm_low | (pwm_high << 8)
+                log_entry += f"  PWM低字节: {pwm_low} (0x{pwm_low:02X})\n"
+                log_entry += f"  PWM高字节: {pwm_high} (0x{pwm_high:02X})\n"
+                log_entry += f"  PWM值:     {pwm_value}\n"
+            elif packet_type == 'bulk' and packet_length == 80:
+                log_entry += f"  80字节批量包（16个风扇 × 5字节）\n\n"
+                for i in range(16):
+                    offset = i * 5
+                    fan_id = packet[offset + 2]
+                    pwm_low = packet[offset + 3]
+                    pwm_high = packet[offset + 4]
+                    pwm_value = pwm_low | (pwm_high << 8)
+                    log_entry += f"  风扇{fan_id:2d}: PWM={pwm_value:3d} | "
+                    log_entry += f" bytes: {packet[offset]:02X} {packet[offset+1]:02X} {packet[offset+2]:02X} {packet[offset+3]:02X} {packet[offset+4]:02X}\n"
+
+            log_entry += "\n"
+
+            # 追加写入文件
+            with self.csv_lock:
+                with open(expected_file, 'a', encoding='utf-8') as f:
+                    f.write(log_entry)
+
+        except Exception as e:
+            if self.enable_logging and self.logger:
+                self.logger.warning(f"记录原始数据失败: {e}")
+
+    def _log_fan_data(self, ip: str, fan_id: int, chain_id: int, board_id: int, new_pwm: int):
+        """
+        记录风机通讯数据到CSV文件
+
+        Args:
+            ip: IP地址
+            fan_id: 风扇ID (0-15，逻辑ID)
+            chain_id: 链路ID (0-9)
+            board_id: 板ID (0-9)
+            new_pwm: 新的PWM值
+        """
+        try:
+            # 应用风扇ID映射：逻辑ID -> 物理ID
+            physical_fan_id = self.fan_id_mapping.get(fan_id, fan_id)
+            fan_key = f"{ip}_{physical_fan_id}"
+
+            with self.pwm_lock:
+                old_pwm = self.fan_pwm_states.get(fan_key, 0)
+                self.fan_pwm_states[fan_key] = new_pwm
+
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            pwm_change = new_pwm - old_pwm
+
+            with self.csv_lock:
+                # 检查是否需要切换到新日期的文件
+                date_str = datetime.now().strftime('%Y%m%d')
+                expected_file = os.path.join(self.data_dir, f'fan_data_{date_str}.csv')
+
+                if self.csv_file != expected_file:
+                    self._init_csv_file()
+                    expected_file = self.csv_file
+
+                # 追加写入CSV（使用映射后的物理风扇ID）
+                with open(expected_file, 'a', newline='', encoding='utf-8') as f:
+                    writer = csv.writer(f)
+                    writer.writerow([
+                        timestamp,
+                        ip,
+                        physical_fan_id,  # 使用映射后的物理风扇ID
+                        chain_id,
+                        board_id,
+                        old_pwm,
+                        new_pwm,
+                        pwm_change
+                    ])
+
+        except Exception as e:
+            if self.enable_logging and self.logger:
+                self.logger.warning(f"记录风机数据失败: {e}")
+
     def _build_control_packet(self, chain_id: int, board_id: int, fan_id: int, pwm_value: int) -> bytes:
         """
         构建控制数据包（5字节协议）
@@ -179,12 +390,15 @@ class FanUDPSender:
         Args:
             chain_id: 链路ID (0-9) - 固定为0x00
             board_id: 电驱板ID (0-9) - 固定为0x00
-            fan_id: 风扇ID (0-15)
+            fan_id: 逻辑风扇ID (0-15)
             pwm_value: PWM值 (0-999)
 
         Returns:
             bytes: 5字节的控制数据包
         """
+        # 应用风扇ID映射：逻辑ID -> 物理ID
+        physical_fan_id = self.fan_id_mapping.get(fan_id, fan_id)
+
         # 限制PWM值范围
         pwm_value = max(0, min(PROTOCOL_CONFIG['pwm_max'], pwm_value))
 
@@ -193,7 +407,7 @@ class FanUDPSender:
             '<BBBBB',  # 5个1字节: little-endian
             0x00,                    # 1字节: 链路ID（固定0）
             0x00,                    # 1字节: 板ID（固定0）
-            fan_id & 0xFF,           # 1字节: 风扇ID
+            physical_fan_id & 0xFF,  # 1字节: 风扇ID（使用映射后的物理ID）
             pwm_value & 0xFF,        # 1字节: PWM低字节
             (pwm_value >> 8) & 0xFF  # 1字节: PWM高字节
         )
@@ -220,14 +434,18 @@ class FanUDPSender:
             return b''
 
         # 构建80字节数据包（16个风扇，每个5字节）
+        # 注意：物理风扇ID范围是1-16，不是0-15
         packet_parts = []
-        for fan_id in range(16):
-            pwm_value = max(0, min(PROTOCOL_CONFIG['pwm_max'], pwm_values[fan_id]))
+        for physical_fan_id in range(1, 17):  # 1-16，不是0-15
+            # 找到对应的逻辑风扇ID
+            logical_fan_id = self.physical_to_logical_fan.get(physical_fan_id, physical_fan_id - 1)
+            # 从逻辑PWM值列表中取出对应的PWM值
+            pwm_value = max(0, min(PROTOCOL_CONFIG['pwm_max'], pwm_values[logical_fan_id]))
             packet_parts.append(struct.pack(
                 '<BBBBB',  # 5个1字节
                 0x00,                    # 链路ID（固定0）
                 0x00,                    # 板ID（固定0）
-                fan_id & 0xFF,           # 风扇ID
+                physical_fan_id & 0xFF,  # 物理风扇ID（1-16）
                 pwm_value & 0xFF,        # PWM低字节
                 (pwm_value >> 8) & 0xFF  # PWM高字节
             ))
@@ -279,6 +497,12 @@ class FanUDPSender:
             self.stats['total_packets'] += 1
             self.stats['success_packets'] += 1
             self.stats['last_send_time'] = datetime.now()
+
+            # 记录风机通讯数据（CSV格式）
+            self._log_fan_data(target_ip, fan_id, chain_id, board_id, pwm_value)
+
+            # 记录原始数据包（TXT格式）
+            self._log_raw_data(target_ip, self.udp_port, packet, 'single')
 
             return True
 
@@ -334,13 +558,14 @@ class FanUDPSender:
                 module_data = grid_data[row_start:row_end, col_start:col_end]
 
                 # 发送16个风扇的数据
-                for fan_id in range(16):
-                    row = fan_id // 4
-                    col = fan_id % 4
+                # 注意：fan_id 在这里既是 module_data 的索引，也是逻辑风扇ID
+                for logical_fan_id in range(16):
+                    row = logical_fan_id // 4
+                    col = logical_fan_id % 4
                     percent = module_data[row, col]
                     pwm_value = int((percent / 100.0) * PROTOCOL_CONFIG['pwm_max'])
 
-                    success = self.send_to_board(chain_id, board_in_chain, fan_id, pwm_value)
+                    success = self.send_to_board(chain_id, board_in_chain, logical_fan_id, pwm_value)
 
                     # 记录结果：使用 chain_id*10+board_in_chain 作为key
                     results[global_board_id * 16 + fan_id] = success
@@ -401,16 +626,17 @@ class FanUDPSender:
 
             module_data = grid_data[row_start:row_end, col_start:col_end]
 
-            # 构建16个风扇的PWM值列表
+            # 构建16个风扇的PWM值列表（按逻辑风扇ID顺序）
+            # pwm_values[i] = 逻辑风扇i的PWM值
             pwm_values = []
-            for fan_id in range(16):
-                row = fan_id // 4
-                col = fan_id % 4
+            for logical_fan_id in range(16):
+                row = logical_fan_id // 4
+                col = logical_fan_id % 4
                 percent = module_data[row, col]
                 pwm_value = int((percent / 100.0) * PROTOCOL_CONFIG['pwm_max'])
                 pwm_values.append(pwm_value)
 
-            # 构建80字节数据包
+            # 构建80字节数据包（会自动将逻辑PWM值映射到物理风扇位置）
             packet = self._build_bulk_packet(chain_id, board_in_chain, pwm_values)
 
             # 检查数据包是否有效
@@ -433,6 +659,13 @@ class FanUDPSender:
 
                 results[global_board_id] = True
                 success_count += 1
+
+                # 记录每个风扇的数据（CSV格式）
+                for fan_id in range(16):
+                    self._log_fan_data(target_ip, fan_id, chain_id, board_in_chain, pwm_values[fan_id])
+
+                # 记录原始数据包（TXT格式）
+                self._log_raw_data(target_ip, self.udp_port, packet, 'bulk')
 
             except Exception as e:
                 self.stats['total_packets'] += 1
@@ -505,16 +738,17 @@ class FanUDPSender:
 
                 module_data = grid_data[row_start:row_end, col_start:col_end]
 
-                # 构建16个风扇的PWM值列表
+                # 构建16个风扇的PWM值列表（按逻辑风扇ID顺序）
+                # pwm_values[i] = 逻辑风扇i的PWM值
                 pwm_values = []
-                for fan_id in range(16):
-                    row = fan_id // 4
-                    col = fan_id % 4
+                for logical_fan_id in range(16):
+                    row = logical_fan_id // 4
+                    col = logical_fan_id % 4
                     percent = module_data[row, col]
                     pwm_value = int((percent / 100.0) * PROTOCOL_CONFIG['pwm_max'])
                     pwm_values.append(pwm_value)
 
-                # 构建80字节数据包
+                # 构建80字节数据包（会自动将逻辑PWM值映射到物理风扇位置）
                 packet = self._build_bulk_packet(chain_id, board_in_chain, pwm_values)
 
                 # 检查数据包是否有效
@@ -537,6 +771,13 @@ class FanUDPSender:
 
                     results[global_board_id] = True
                     success_count += 1
+
+                    # 记录每个风扇的数据（CSV格式）
+                    for fan_id in range(16):
+                        self._log_fan_data(target_ip, fan_id, chain_id, board_in_chain, pwm_values[fan_id])
+
+                    # 记录原始数据包（TXT格式）
+                    self._log_raw_data(target_ip, self.udp_port, packet, 'bulk')
 
                 except Exception as e:
                     self.stats['total_packets'] += 1
