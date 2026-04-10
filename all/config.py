@@ -191,6 +191,26 @@ DEBUG_CONFIG = {
     'verbose': False
 }
 
+# ==================== PLC监控配置 ====================
+PLC_CONFIG = {
+    'ip_address': '192.168.0.1',
+    'rack': 0,
+    'slot': 1,
+    'timeout': 10,
+    'encoder': {
+        'db_number': 5,
+        'offset': 124,
+        'data_type': 'REAL',
+        'min_value': -1000.0,
+        'max_value': 1000.0
+    },
+    'point_table': {
+        'file': '点位表.xlsx',
+        'refresh_interval': 1000,  # 毫秒
+        'batch_by_db': True
+    }
+}
+
 # ==================== 导出配置字典 ====================
 ALL_CONFIGS = {
     'system': SYSTEM_CONFIG,
@@ -206,7 +226,8 @@ ALL_CONFIGS = {
     'hardware': HARDWARE_CONFIG,
     'visualization': VISUALIZATION_CONFIG,
     'simulation': SIMULATION_CONFIG,
-    'debug': DEBUG_CONFIG
+    'debug': DEBUG_CONFIG,
+    'plc': PLC_CONFIG
 }
 
 

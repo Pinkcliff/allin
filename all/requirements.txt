@@ -32,6 +32,9 @@ vtk==9.5.2
 # Modbus (来自 frist)
 pymodbus==3.7.4
 
+# 西门子S7协议 (PLC监控)
+python-snap7==1.3
+
 # ==================== 工具库 ====================
 # 进度条 (来自 setest)
 tqdm==4.66.1
@@ -45,3 +48,6 @@ colorlog==6.8.0
 
 # 时间处理
 python-dateutil==2.8.2
+
+# Excel处理 (点位表)
+openpyxl==3.1.0

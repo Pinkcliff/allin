@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, Q
                                QTableWidget, QCheckBox, QSlider, QTextEdit, QFormLayout,
                                QLineEdit, QSpinBox, QFrame, QRadioButton)
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QDoubleValidator, QPalette, QColor, QPixmap,QIntValidator
+from PySide6.QtGui import QDoubleValidator, QPalette, QColor, QPixmap, QFont, QIntValidator
 from functools import partial
 import debug
 from ui_custom_widgets import DraggableFrame, OverallHealthIndicator, CommunicationStatusIndicator, EnvironmentDisplay, BackgroundWidget 
@@ -1200,7 +1200,7 @@ def create_fan_dock(main_window):
     # 图片显示
     image_label = QLabel()
 
-    pixmap = QPixmap("风场.png")  # 确保图片在正确的路径下
+    pixmap = QPixmap("资源/风场.png")  # 确保图片在正确的路径下
 
     # 将图片缩放到 400x400，并保持宽高比
     scaled_pixmap = pixmap.scaled(400, 400, Qt.KeepAspectRatio, Qt.SmoothTransformation)
@@ -1526,7 +1526,7 @@ def create_motion_capture_dock(main_window):
     return dock
 def create_motion_capture_view_dock(main_window):
     # 使用 BackgroundWidget 作为内容
-    content = BackgroundWidget("动捕.png", 1.0) # 1.0 不透明度
+    content = BackgroundWidget("资源/动捕.png", 1.0) # 1.0 不透明度
     dock = create_styled_dock(main_window, "动捕实时视场", content,
                               min_size_from_content=False, is_independent=False)
     dock.resize(1265, 685)
@@ -2060,3 +2060,63 @@ def create_training_dock(main_window):
     layout.addStretch()
 
     return create_styled_dock(main_window, "训练设置", content, is_independent=False)
+
+
+# =========================================================================
+# PLC监控 Dock
+# =========================================================================
+def create_plc_monitor_dock(main_window):
+    """创建PLC监控面板"""
+    import sys
+    import os
+
+    # 添加PLC监控模块路径
+    plc_monitor_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'PLC监控')
+    if plc_monitor_path not in sys.path:
+        sys.path.insert(0, plc_monitor_path)
+
+    from encoder_monitor import EncoderMonitorWidget
+    from point_table_monitor import PointTableMonitorWidget
+
+    content = QWidget()
+    layout = QVBoxLayout(content)
+    layout.setContentsMargins(10, 10, 10, 10)
+    layout.setSpacing(10)
+
+    # 标题
+    title = QLabel("PLC监控系统")
+    title.setStyleSheet("font-size: 16px; font-weight: bold; padding: 5px;")
+    layout.addWidget(title)
+
+    # 创建标签页
+    tab_widget = QTabWidget()
+
+    # 编码器监控标签页
+    encoder_widget = EncoderMonitorWidget()
+    tab_widget.addTab(encoder_widget, "编码器监控")
+
+    # 点位表监控标签页
+    point_table_widget = PointTableMonitorWidget()
+    tab_widget.addTab(point_table_widget, "点位表监控")
+
+    layout.addWidget(tab_widget)
+
+    # 连接状态显示
+    status_layout = QHBoxLayout()
+    status_label = QLabel("PLC状态:")
+    status_label.setStyleSheet("font-weight: bold;")
+    plc_status = QLabel("未连接")
+    plc_status.setStyleSheet("color: #888; padding: 5px;")
+    status_layout.addWidget(status_label)
+    status_layout.addWidget(plc_status)
+    status_layout.addStretch()
+    layout.addLayout(status_layout)
+
+    # 保存PLC状态引用到主窗口（可选）
+    if not hasattr(main_window, 'plc_status_label'):
+        main_window.plc_status_label = plc_status
+
+    dock = create_styled_dock(main_window.canvas, "PLC监控", content, is_independent=False)
+    dock.resize(400, 500)
+
+    return dock

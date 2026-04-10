@@ -205,7 +205,7 @@ class GlobalDashboardWindow(QMainWindow):
             }
 
     def setup_ui(self):
-        self.canvas = BackgroundWidget("背景.png", 0.5)
+        self.canvas = BackgroundWidget("资源/背景.png", 0.5)
         self.setCentralWidget(self.canvas)
 
         self.toolbar = QToolBar("主工具栏")
@@ -250,6 +250,10 @@ class GlobalDashboardWindow(QMainWindow):
         self.docks['传感器数据'] = create_sensor_data_dock(self)
         self.docks['传感器数据'].hide()
 
+        # --- 创建PLC监控Dock ---
+        self.docks['PLC监控'] = Docks.create_plc_monitor_dock(self)
+        self.docks['PLC监控'].hide()
+
         # Position default Docks - 设置默认dock的位置
         self.docks['系统'].move(20, 10); self.docks['系统'].resize(250, 135)
         self.docks['通讯'].move(280, 10); self.docks['通讯'].resize(910, 310)
@@ -267,9 +271,9 @@ class GlobalDashboardWindow(QMainWindow):
 
         # Setup Toolbar
         button_order = ["系统", "通讯", "环境", "日志",
-                        "俯仰·造雨·示踪", "风机", "动捕", "传感器数据", "标定", "仿真", "训练"]
+                        "俯仰·造雨·示踪", "风机", "动捕", "传感器数据", "PLC监控", "标定", "仿真", "训练"]
 
-        dynamic_docks = ['俯仰·造雨·示踪', '风机', '动捕', '传感器数据', '标定', '仿真', '训练', '设置']
+        dynamic_docks = ['俯仰·造雨·示踪', '风机', '动捕', '传感器数据', 'PLC监控', '标定', '仿真', '训练', '设置']
 
         for name in button_order:
             button = QPushButton(name)
