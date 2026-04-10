@@ -13,14 +13,14 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
 # 添加项目根目录到路径
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-# 添加仪表盘目录到路径
-dashboard_dir = os.path.join(ROOT_DIR, 'dashboard')
-if dashboard_dir not in sys.path:
-    sys.path.insert(0, dashboard_dir)
+# 添加src目录到路径
+SRC_DIR = os.path.dirname(os.path.abspath(__file__))
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
 
 
 class LauncherWindow(QMainWindow):
@@ -156,7 +156,7 @@ class LauncherWindow(QMainWindow):
     def launch_dashboard(self):
         """启动全局监控仪表盘"""
         try:
-            from ui_main_window import GlobalDashboardWindow
+            from dashboard.ui_main_window import GlobalDashboardWindow
 
             self.dashboard_window = GlobalDashboardWindow()
             self.dashboard_window.show()
@@ -169,7 +169,7 @@ class LauncherWindow(QMainWindow):
     def launch_fusion(self):
         """启动融合系统（仪表盘 + 传感器数据）"""
         try:
-            from ui_main_window import GlobalDashboardWindow
+            from dashboard.ui_main_window import GlobalDashboardWindow
 
             # 创建仪表盘窗口
             self.dashboard_window = GlobalDashboardWindow()
@@ -204,7 +204,7 @@ class LauncherWindow(QMainWindow):
                 self.launch_fusion()
             else:
                 # 启动独立的传感器采集窗口（这里我们仍然使用仪表盘，但只显示传感器数据dock）
-                from ui_main_window import GlobalDashboardWindow
+                from dashboard.ui_main_window import GlobalDashboardWindow
 
                 self.sensor_window = GlobalDashboardWindow()
                 self.sensor_window.show()
