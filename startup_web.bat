@@ -18,31 +18,24 @@ REM Activate my_env environment
 echo Activating my_env environment...
 call D:\ProgramData\Anaconda3\Scripts\activate.bat my_env
 
-REM Install backend dependencies if needed
-echo.
-echo Checking backend dependencies...
-cd /d "%~dp0web\backend"
-if not exist "venv" (
-    echo Creating virtual environment for backend...
-    python -m venv venv
-)
-
 REM Install backend dependencies
+echo.
 echo Installing backend dependencies...
+cd /d "%~dp0web\backend"
 pip install -q -r requirements.txt
 
 REM Start backend server
 echo.
 echo Starting Backend Server...
-start "Backend Server" cmd /k "cd /d %~dp0web\backend && venv\Scripts\activate && python -m main"
+start "Backend Server" cmd /k "cd /d %~dp0web\backend && python -m main"
 
 REM Wait for backend to start
 echo Waiting for backend to start...
 timeout /t 5 /nobreak > nul
 
-REM Install frontend dependencies if needed
+REM Install frontend dependencies
 echo.
-echo Checking frontend dependencies...
+echo Installing frontend dependencies...
 cd /d "%~dp0web\frontend"
 if not exist "node_modules" (
     echo Installing frontend dependencies (this may take a while)...
