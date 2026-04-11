@@ -4,9 +4,19 @@
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# 全局风扇数据存储（用于从桌面端同步）
+_fan_data_store = {
+    "fan_array": [[0 for _ in range(40)] for _ in range(40)],
+    "last_update": None,
+    "last_timestamp": 0  # 【新增】记录最新的时间戳
+}
 
 
 class FanStatusResponse(BaseModel):
@@ -45,23 +55,27 @@ class FanTemplateRequest(BaseModel):
     data: List[List[int]]
 
 
-@router.get("/status", response_model=FanStatusResponse)
+@router.get("/status")
 async def get_fan_status():
     """
     获取风扇阵列状态
 
-    返回40x40风扇阵列的状态
+    返回40x40风扇阵列的状态（PWM值0-1000）
     """
-    # TODO: 从实际硬件获取状态
-    import random
-    fan_array = [[random.randint(0, 1) for _ in range(40)] for _ in range(40)]
+    # 从存储中获取数据（从桌面端同步的数据）
+    fan_array = _fan_data_store["fan_array"]
 
-    return FanStatusResponse(
-        total_fans=1600,
-        online_fans=1600,
-        active_fans=sum(sum(row) for row in fan_array),
-        fan_array=fan_array
-    )
+    # 计算统计数据
+    total_fans = 40 * 40  # 1600
+    online_fans = total_fans  # 假设所有风扇都在线
+    active_fans = sum(1 for row in fan_array for cell in row if cell > 0)  # PWM大于0的风扇数量
+
+    return {
+        "total_fans": total_fans,
+        "online_fans": online_fans,
+        "active_fans": active_fans,
+        "fan_array": fan_array
+    }
 
 
 @router.post("/power")
@@ -75,6 +89,51 @@ async def set_fan_power(request: FanPowerRequest):
         "power_on": request.power_on,
         "message": f"所有风扇已{'开启' if request.power_on else '关闭'}"
     }
+
+
+@router.post("/sync")
+async def sync_fan_array(data: Dict[str, Any]):
+    """
+    接收桌面端风扇阵列数据同步
+
+    Args:
+        data: 包含fan_array和timestamp的字典
+    """
+    try:
+        from web.backend.websocket.manager import websocket_manager
+
+        # 更新本地存储
+        if "fan_array" in data:
+            fan_array = data["fan_array"]
+            timestamp = data.get("timestamp", 0)
+
+            # 【新增】时间戳检查：只处理比当前更新的数据
+            if timestamp <= _fan_data_store["last_timestamp"]:
+                logger.debug(f"忽略旧数据，当前: {_fan_data_store['last_timestamp']}, 收到: {timestamp}")
+                return {"success": True, "message": "忽略旧数据"}
+
+            _fan_data_store["fan_array"] = fan_array
+            _fan_data_store["last_update"] = timestamp
+            _fan_data_store["last_timestamp"] = timestamp
+
+            # 计算统计数据
+            active_count = sum(1 for row in fan_array for cell in row if cell > 0)
+
+            # 通过WebSocket推送到所有Web客户端
+            await websocket_manager.broadcast("fan_update", {
+                "fan_array": fan_array,
+                "total_fans": 1600,
+                "active_fans": active_count,
+                "timestamp": timestamp
+            })
+
+            logger.info(f"风扇阵列已同步: {active_count} 个风扇运行中")
+            return {"success": True, "message": "风扇阵列同步成功"}
+        else:
+            return {"success": False, "message": "无效的数据格式"}
+    except Exception as e:
+        logger.error(f"风扇阵列同步失败: {e}")
+        return {"success": False, "message": str(e)}
 
 
 @router.post("/area")

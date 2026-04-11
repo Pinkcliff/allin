@@ -7,33 +7,30 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from ..config import settings
 
 router = APIRouter()
 
-# 密码加密上下文
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 # 用户数据模型（临时使用内存存储，生产环境应使用数据库）
+# 注意：这是开发环境配置，使用明文密码，生产环境必须使用哈希
 USERS_DB = {
     "admin": {
         "username": "admin",
-        "password_hash": pwd_context.hash("admin123"),
+        "password": "admin123",
         "role": "admin",
         "full_name": "系统管理员"
     },
     "operator": {
         "username": "operator",
-        "password_hash": pwd_context.hash("operator123"),
+        "password": "operator123",
         "role": "operator",
         "full_name": "操作员"
     },
     "viewer": {
         "username": "viewer",
-        "password_hash": pwd_context.hash("viewer123"),
+        "password": "viewer123",
         "role": "viewer",
         "full_name": "观察员"
     }
@@ -72,9 +69,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """验证密码"""
-    return pwd_context.verify(plain_password, hashed_password)
+def verify_password(plain_password: str, password: str) -> bool:
+    """验证密码（开发环境使用明文比较）"""
+    return plain_password == password
 
 
 def get_user(username: str) -> Optional[dict]:
@@ -93,7 +90,7 @@ async def login(request: LoginRequest):
     - 观察员: viewer/viewer123
     """
     user = get_user(request.username)
-    if not user or not verify_password(request.password, user["password_hash"]):
+    if not user or not verify_password(request.password, user["password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",

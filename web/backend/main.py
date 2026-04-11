@@ -22,9 +22,9 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import logging
 
-from .websocket.manager import websocket_manager
-from .api import auth, system, device, fan, env, plc, motion, sensor
-from .config import settings
+from web.backend.websocket.manager import websocket_manager
+from web.backend.api import auth, system, device, fan, env, plc, motion, sensor, sync
+from web.backend.config import settings
 
 # 配置日志
 logging.basicConfig(
@@ -70,6 +70,7 @@ app.include_router(env.router, prefix="/api/env", tags=["环境"])
 app.include_router(plc.router, prefix="/api/plc", tags=["PLC"])
 app.include_router(motion.router, prefix="/api/motion", tags=["动捕"])
 app.include_router(sensor.router, prefix="/api/sensor", tags=["传感器"])
+app.include_router(sync.router, prefix="/api", tags=["同步"])
 
 
 @app.get("/")
@@ -111,7 +112,7 @@ if __name__ == "__main__":
     logger.info(f"API文档: http://{settings.HOST}:{settings.PORT}/docs")
 
     uvicorn.run(
-        "main:app",
+        "web.backend.main:app",
         host=settings.HOST,
         port=settings.PORT,
         reload=settings.DEBUG,

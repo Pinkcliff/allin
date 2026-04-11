@@ -11,6 +11,14 @@ from . import debug
 from .ui_motion_capture import CameraSettingsDock
 from .ui_sensor_dock import create_sensor_data_dock
 
+# 导入Web同步客户端
+try:
+    from modules.core.data_sync.web_sync_client import get_web_sync_client
+    WEB_SYNC_AVAILABLE = True
+except ImportError:
+    WEB_SYNC_AVAILABLE = False
+    print("Warning: Web sync client not available")
+
 # 【新增】导入动捕采集窗口
 import sys
 import os
@@ -64,12 +72,19 @@ class GlobalDashboardWindow(QMainWindow):
         
         self.data_simulator.comm_speed_updated.connect(self.on_comm_speed_updated)
         
+        # 初始化Web同步客户端（必须在data_simulator信号连接之前）
+        if WEB_SYNC_AVAILABLE:
+            self.web_sync_client = get_web_sync_client()
+            debug.log_debug("Web同步客户端已初始化")
+        else:
+            self.web_sync_client = None
+
         self.time_updater = QTimer(self)
-        
+
         self.time_updater.timeout.connect(self.update_time_label)
-        
+
         self.time_updater.start(1000)
-        
+
         self.update_device_state()
 
         debug.log_debug("主窗口初始化完成。")
@@ -482,6 +497,17 @@ class GlobalDashboardWindow(QMainWindow):
             self.chart_voltage_widget.update_data(voltage)
         if hasattr(self, 'chart_power_widget') and self.chart_power_widget:
             self.chart_power_widget.update_data(power)
+
+        # 同步数据到Web端
+        if self.web_sync_client and self.device_on:
+            try:
+                self.web_sync_client.sync_environment(
+                    temperature=25.0,  # 这里应该使用真实温度值
+                    humidity=60.0,     # 这里应该使用真实湿度值
+                    pressure=101325.0  # 这里应该使用真实气压值
+                )
+            except Exception as e:
+                debug.log_debug(f"Web同步失败: {e}")
 
     def on_comm_speed_updated(self, module_name, speed_str):
         for indicator in self.comm_indicators:

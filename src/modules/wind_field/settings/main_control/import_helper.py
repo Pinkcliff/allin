@@ -18,19 +18,20 @@ def get_functions_module():
     import sys
     import os
 
-    # 获取项目根目录
+    # 获取项目根目录 - 需要包含 editor 子目录
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    root_dir = os.path.dirname(os.path.dirname(current_dir))
+    # 从 main_control 向上到 wind_field，然后加上 editor
+    wind_field_dir = os.path.dirname(os.path.dirname(current_dir))
+    editor_dir = os.path.join(wind_field_dir, 'editor')
 
-    # 确保根目录在sys.path中
-    if root_dir not in sys.path:
-        sys.path.insert(0, root_dir)
+    # 确保 editor 目录在 sys.path 中
+    if editor_dir not in sys.path:
+        sys.path.insert(0, editor_dir)
 
     # 可能的模块路径
     module_paths = [
-        'wind_field_editor_code.functions',   # 复制的英文路径（优先）
-        'wind_field_editor.functions',         # 原来的英文路径
-        '风场编辑器.wind_field_editor.functions',  # 中文路径
+        'wind_field_editor.functions',         # 标准英文路径（优先）
+        'wind_field_editor_code.functions',   # 备用路径
     ]
 
     last_error = None

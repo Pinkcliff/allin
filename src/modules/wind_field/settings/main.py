@@ -7,8 +7,10 @@ import sys
 import os
 
 # 添加项目根目录到 Python 路径
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, project_root)
+# 从 settings 目录向上三级到达项目根目录 (F:\A-User\cliff\allin\src)
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 # 设置 Qt 插件路径（修复 Qt 平台插件加载问题）
 import PySide6

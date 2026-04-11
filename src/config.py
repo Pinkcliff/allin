@@ -122,13 +122,13 @@ CFD_CONFIG = {
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # 模块路径
-DASHBOARD_DIR = os.path.join(ROOT_DIR, '仪表盘')
-WIND_CONFIG_DIR = os.path.join(ROOT_DIR, '风场设置')
-PRE_PROCESSOR_DIR = os.path.join(ROOT_DIR, '前处理')
-HARDWARE_DIR = os.path.join(ROOT_DIR, '硬件控制')
-WIND_EDITOR_DIR = os.path.join(ROOT_DIR, '风场编辑器')
-CORE_DIR = os.path.join(ROOT_DIR, '核心模块')
-RESOURCE_DIR = os.path.join(ROOT_DIR, '资源')
+DASHBOARD_DIR = os.path.join(ROOT_DIR, 'dashboard')
+WIND_CONFIG_DIR = os.path.join(ROOT_DIR, 'modules', 'wind_field', 'settings')
+PRE_PROCESSOR_DIR = os.path.join(ROOT_DIR, 'modules', 'wind_field', 'preprocessing')
+HARDWARE_DIR = os.path.join(ROOT_DIR, 'modules', 'hardware')
+WIND_EDITOR_DIR = os.path.join(ROOT_DIR, 'modules', 'wind_field', 'editor')
+CORE_DIR = os.path.join(ROOT_DIR, 'modules', 'core')
+RESOURCE_DIR = os.path.join(ROOT_DIR, 'assets')
 
 # 资源文件路径
 BACKGROUND_IMAGE = os.path.join(RESOURCE_DIR, '背景.png')

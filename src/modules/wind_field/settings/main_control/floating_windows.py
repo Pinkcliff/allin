@@ -266,30 +266,61 @@ class TimeSettingsWindow(QDialog):
 
 class TemplateLibraryWindow(QDialog):
     """模版库浮动窗口"""
+    # 信号定义
+    load_template_signal = Signal(str)  # 加载模板信号：模板名称
+    save_template_signal = Signal(str)  # 保存模板信号：模板名称
+    delete_template_signal = Signal(str)  # 删除模板信号：模板名称
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("项目与模版库")
         self.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
         self.resize(300, 400)
-        
+
         layout = QVBoxLayout(self)
-        
+
         self.template_list = QListWidget()
         self.template_list.setSelectionMode(QAbstractItemView.SingleSelection)
         # 添加示例模板
         self.template_list.addItems(["中心高斯喷流_v1", "左右扫描风_初始", "城市峡谷风"])
-        
+
         button_layout = QHBoxLayout()
         self.load_button = QPushButton("加载")
         self.save_button = QPushButton("保存")
         self.delete_button = QPushButton("删除")
-        
+
         button_layout.addWidget(self.load_button)
         button_layout.addWidget(self.save_button)
         button_layout.addWidget(self.delete_button)
-        
+
         layout.addWidget(self.template_list)
         layout.addLayout(button_layout)
+
+        # 连接按钮信号
+        self.load_button.clicked.connect(self._on_load_clicked)
+        self.save_button.clicked.connect(self._on_save_clicked)
+        self.delete_button.clicked.connect(self._on_delete_clicked)
+
+    def _on_load_clicked(self):
+        """加载按钮点击处理"""
+        current_item = self.template_list.currentItem()
+        if current_item:
+            template_name = current_item.text()
+            self.load_template_signal.emit(template_name)
+
+    def _on_save_clicked(self):
+        """保存按钮点击处理"""
+        # TODO: 实现保存功能
+        pass
+
+    def _on_delete_clicked(self):
+        """删除按钮点击处理"""
+        current_item = self.template_list.currentItem()
+        if current_item:
+            template_name = current_item.text()
+            self.delete_template_signal.emit(template_name)
+            # 从列表中移除
+            self.template_list.takeItem(self.template_list.row(current_item))
 
 # floating_windows.py -> CircleToolWindow
 

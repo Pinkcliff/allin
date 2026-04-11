@@ -6,28 +6,28 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, Q
 from .ui_custom_widgets import CommunicationStatusIndicator
 themes = {
     "dark": {
-        "main_bg": "#1a1c23", 
-        "frame_bg": "#2a2c33",  # MODIFIED: Was rgba(42, 44, 51, 0.8)
-        "frame_border": "#3a3c43",
-        "title_bar_bg": "#3a3c43", "text_color": "#e1e1e6", "text_secondary_color": "#8a8f98",
-        "text_tertiary_color": "#5e626a", "toolbar_bg": "#2a2c33", "button_bg": "#3a3c43",
-        "button_border": "#4a4c53", "button_text": "#e1e1e6", "button_checked_bg": "#00d1ff",
-        "button_checked_text": "#1a1c23", "tab_bg": "#2a2c33", "tab_selected_bg": "#3a3c43",
-        "table_grid": "#3a3c43", "header_bg": "#2a2c33", "textbox_bg": "#2a2c33",
-        "chart_title_bg": "rgba(42, 44, 51, 0.7)", "close_button_bg": "#3a3c43",
-        "close_button_text": "#2a2c33", "close_button_hover": "#5a5c63",
+        "main_bg": "#0b0f19",
+        "frame_bg": "#141926",
+        "frame_border": "rgba(255, 255, 255, 0.06)",
+        "title_bar_bg": "#0f1420", "text_color": "#f0f2f5", "text_secondary_color": "#8b95a8",
+        "text_tertiary_color": "#4b5567", "toolbar_bg": "#0f1420", "button_bg": "rgba(30, 37, 56, 0.6)",
+        "button_border": "rgba(255, 255, 255, 0.1)", "button_text": "#f0f2f5", "button_checked_bg": "#0ea5e9",
+        "button_checked_text": "#ffffff", "tab_bg": "#0f1420", "tab_selected_bg": "#141926",
+        "table_grid": "rgba(255, 255, 255, 0.06)", "header_bg": "#0f1420", "textbox_bg": "rgba(30, 37, 56, 0.6)",
+        "chart_title_bg": "rgba(20, 25, 38, 0.75)", "close_button_bg": "rgba(30, 37, 56, 0.6)",
+        "close_button_text": "#8b95a8", "close_button_hover": "rgba(14, 165, 233, 0.15)",
     },
     "light": {
-        "main_bg": "#f0f2f5", 
-        "frame_bg": "#ffffff",  # MODIFIED: Was rgba(255, 255, 255, 0.8)
-        "frame_border": "#d9d9d9",
-        "title_bar_bg": "#e8e8e8", "text_color": "#2c3e50", "text_secondary_color": "#596275",
-        "text_tertiary_color": "#8395a7", "toolbar_bg": "#ffffff", "button_bg": "#e8e8e8",
-        "button_border": "#d9d9d9", "button_text": "#2c3e50", "button_checked_bg": "#00d1ff",
-        "button_checked_text": "#ffffff", "tab_bg": "#f0f2f5", "tab_selected_bg": "#ffffff",
-        "table_grid": "#d9d9d9", "header_bg": "#f0f2f5", "textbox_bg": "#ffffff",
-        "chart_title_bg": "rgba(255, 255, 255, 0.7)", "close_button_bg": "#d9d9d9",
-        "close_button_text": "#596275", "close_button_hover": "#c0c0c0",
+        "main_bg": "#f8fafc",
+        "frame_bg": "#ffffff",
+        "frame_border": "rgba(0, 0, 0, 0.07)",
+        "title_bar_bg": "#ffffff", "text_color": "#1e293b", "text_secondary_color": "#64748b",
+        "text_tertiary_color": "#94a3b8", "toolbar_bg": "#ffffff", "button_bg": "#f1f5f9",
+        "button_border": "rgba(0, 0, 0, 0.12)", "button_text": "#1e293b", "button_checked_bg": "#0284c7",
+        "button_checked_text": "#ffffff", "tab_bg": "#f8fafc", "tab_selected_bg": "#ffffff",
+        "table_grid": "rgba(0, 0, 0, 0.07)", "header_bg": "#f8fafc", "textbox_bg": "#ffffff",
+        "chart_title_bg": "rgba(255, 255, 255, 0.9)", "close_button_bg": "#f1f5f9",
+        "close_button_text": "#64748b", "close_button_hover": "rgba(2, 132, 199, 0.1)",
     }
 }
 
@@ -55,19 +55,26 @@ def apply_theme(window, theme_name):
     
     # --- 2. 工具栏按钮样式 ---
     button_style = f"""
-        QPushButton {{ 
-            font-size: 14px;
+        QPushButton {{
+            font-size: 13px;
+            font-weight: 500;
             color: {theme['button_text']};
-            background-color: {theme['button_bg']}; 
+            background-color: {theme['button_bg']};
             border: 1px solid {theme['button_border']};
-            border-radius: 5px;
+            border-radius: 6px;
+            padding: 6px 14px;
         }}
         QPushButton:hover {{
-            border-color: #00d1ff;
+            border-color: #0ea5e9;
+            background-color: rgba(14, 165, 233, 0.08);
+        }}
+        QPushButton:pressed {{
+            background-color: rgba(14, 165, 233, 0.15);
         }}
         QPushButton:checked {{
             background-color: {theme['button_checked_bg']};
             color: {theme['button_checked_text']};
+            border-color: {theme['button_checked_bg']};
         }}
     """
     for button in window.toolbar.findChildren(QPushButton):
@@ -83,7 +90,10 @@ def apply_theme(window, theme_name):
             DraggableFrame {{
                 background-color: {theme['frame_bg']};
                 border: 1px solid {theme['frame_border']};
-                border-radius: 8px;
+                border-radius: 10px;
+            }}
+            DraggableFrame:hover {{
+                border-color: rgba(14, 165, 233, 0.15);
             }}
         """)
         
@@ -92,17 +102,19 @@ def apply_theme(window, theme_name):
         if hasattr(dock, 'title_bar'):
             dock.title_bar.setStyleSheet(f"""
                 background-color: {theme['title_bar_bg']};
-                border-top-left-radius: 7px;
-                border-top-right-radius: 7px;
+                border-top-left-radius: 9px;
+                border-top-right-radius: 9px;
+                border-bottom: 1px solid {theme['frame_border']};
             """)
 
         if hasattr(dock, 'title_label'):
             dock.title_label.setStyleSheet(f"""
                 color: {theme['text_color']};
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 600;
+                letter-spacing: 0.5px;
                 padding: 8px 0;
-                background-color: transparent; /* 确保背景透明 */
+                background-color: transparent;
                 border: none;
             """)
 
@@ -199,11 +211,16 @@ def apply_theme(window, theme_name):
                         color: {theme['button_text']};
                         background-color: {theme['button_bg']};
                         border: 1px solid {theme['button_border']};
-                        border-radius: 4px;
-                        padding: 4px 8px;
+                        border-radius: 6px;
+                        padding: 5px 12px;
+                        font-weight: 500;
                     }}
                     QPushButton:hover {{
-                        border-color: #00d1ff;
+                        border-color: #0ea5e9;
+                        background-color: rgba(14, 165, 233, 0.08);
+                    }}
+                    QPushButton:pressed {{
+                        background-color: rgba(14, 165, 233, 0.15);
                     }}
                 """)
             elif isinstance(child, QTabWidget):
@@ -212,17 +229,25 @@ def apply_theme(window, theme_name):
                     QTabWidget::pane {{
                         border: 1px solid {theme['frame_border']};
                         background-color: transparent;
+                        border-radius: 6px;
                     }}
                     QTabBar::tab {{
                         background: {theme['tab_bg']};
                         border: 1px solid {theme['frame_border']};
                         border-bottom: none;
-                        padding: 8px 15px;
-                        color: {theme['text_color']};
+                        border-top-left-radius: 6px;
+                        border-top-right-radius: 6px;
+                        padding: 8px 18px;
+                        color: {theme['text_secondary_color']};
+                        font-weight: 500;
                     }}
                     QTabBar::tab:selected {{
                         background: {theme['tab_selected_bg']};
-                        color: #00d1ff;
+                        color: #0ea5e9;
+                        border-bottom: 2px solid #0ea5e9;
+                    }}
+                    QTabBar::tab:hover {{
+                        color: #38bdf8;
                     }}
                 """
                 child.setStyleSheet(tab_style)
@@ -263,14 +288,16 @@ def apply_theme(window, theme_name):
                 child.setStyleSheet(f"""
                     QProgressBar {{
                         border: 1px solid {theme['frame_border']};
-                        border-radius: 5px;
+                        border-radius: 6px;
                         text-align: center;
                         color: {theme['text_color']};
                         background-color: {theme['textbox_bg']};
+                        height: 8px;
+                        font-size: 11px;
                     }}
                     QProgressBar::chunk {{
-                        background-color: #4CAF50;
-                        border-radius: 4px;
+                        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0ea5e9, stop:1 #38bdf8);
+                        border-radius: 5px;
                     }}
                 """)
             elif isinstance(child, QTextEdit):
@@ -317,17 +344,25 @@ def apply_theme(window, theme_name):
         QTabWidget::pane {{
             border: 1px solid {theme['frame_border']};
             background-color: transparent;
+            border-radius: 6px;
         }}
         QTabBar::tab {{
             background: {theme['tab_bg']};
             border: 1px solid {theme['frame_border']};
             border-bottom: none;
-            padding: 8px 15px;
-            color: {theme['text_color']};
+            border-top-left-radius: 6px;
+            border-top-right-radius: 6px;
+            padding: 8px 18px;
+            color: {theme['text_secondary_color']};
+            font-weight: 500;
         }}
         QTabBar::tab:selected {{
             background: {theme['tab_selected_bg']};
-            color: #00d1ff;
+            color: #0ea5e9;
+            border-bottom: 2px solid #0ea5e9;
+        }}
+        QTabBar::tab:hover {{
+            color: #38bdf8;
         }}
     """
     table_style = f"""

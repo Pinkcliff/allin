@@ -4,7 +4,10 @@
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict, Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -42,6 +45,30 @@ async def set_device_power(request: PowerRequest):
         "device_on": request.device_on,
         "message": f"设备已{'启动' if request.device_on else '关闭'}"
     }
+
+
+@router.post("/sync")
+async def sync_device_status(data: Dict[str, Any]):
+    """
+    接收桌面端设备状态同步
+
+    Args:
+        data: 包含devices列表和timestamp的字典
+
+    Returns:
+        同步结果
+    """
+    try:
+        from web.backend.websocket.manager import websocket_manager
+
+        # 通过WebSocket推送到所有订阅的客户端
+        await websocket_manager.broadcast("device_status", data)
+
+        logger.info(f"设备状态已同步: {len(data.get('devices', []))} 个设备")
+        return {"success": True, "message": "设备状态同步成功"}
+    except Exception as e:
+        logger.error(f"设备状态同步失败: {e}")
+        return {"success": False, "message": str(e)}
 
 
 @router.put("/config")

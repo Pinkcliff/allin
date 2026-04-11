@@ -2,6 +2,6 @@
 """
 WebSocket模块
 """
-from .manager import websocket_manager
+from web.backend.websocket.manager import websocket_manager
 
 __all__ = ["websocket_manager"]

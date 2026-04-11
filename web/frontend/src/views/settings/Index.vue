@@ -32,7 +32,7 @@
     <!-- 通讯协议设置 -->
     <div class="card mb-16">
       <div class="card-header">
-        <span><el-icon><Connection /></el-icon> 通讯协议配置</span>
+        <span><el-icon><Link /></el-icon> 通讯协议配置</span>
       </div>
       <div class="card-body">
         <el-table :data="protocols" size="small" stripe>
@@ -129,6 +129,7 @@
 <script setup>
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { User, Link, Setting, InfoFilled } from '@element-plus/icons-vue'
 
 // 用户数据
 const users = ref([

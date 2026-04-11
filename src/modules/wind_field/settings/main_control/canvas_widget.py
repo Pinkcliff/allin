@@ -144,14 +144,14 @@ class CanvasWidget(QGraphicsView):
         mode_widget = self.main_window.tool_stack.currentWidget()
         is_brush_mode = mode_widget == self.main_window.brush_widget
         is_circle_mode = mode_widget == self.main_window.circle_widget
-        
+
         if event.button() == Qt.LeftButton and not is_brush_mode and not is_circle_mode:
             # 设置双击标志，防止触发单击选择
             self._double_click_handled = True
-            
+
             item = self.itemAt(event.pos())
             if not isinstance(item, FanCell): return
-            
+
             modifiers = event.modifiers()
             if modifiers == Qt.ShiftModifier:
                 # Shift+双击：添加模块到选择
@@ -169,6 +169,10 @@ class CanvasWidget(QGraphicsView):
                 self.clear_selection()
                 self._add_module_to_selection(item)
             self.selection_changed.emit(self.selected_cells)
+
+            # 自动切换到点选工具面板，方便查看和操作选中的风扇
+            if mode_widget != self.main_window.selection_widget:
+                self.main_window._show_selection_tool()
                 
         super().mouseDoubleClickEvent(event)
 
@@ -248,6 +252,13 @@ class CanvasWidget(QGraphicsView):
                             feather_value = self.main_window.brush_widget.get_feather_value()
                             description += f" (羽化: {feather_value})"
                         self.main_window._push_edit_command(description)
+
+                        # 同步到Web端
+                        self.main_window._sync_to_web()
+
+                        # 如果启用了UDP自动发送，则发送数据
+                        if self.main_window.udp_send_on_change:
+                            self.main_window._send_pwm_data_via_udp(selected_only=False)
             elif mode_widget == self.main_window.circle_widget:
                 # 圆形选择完成，支持修饰键
                 modifiers = event.modifiers()

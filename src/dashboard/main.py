@@ -3,6 +3,11 @@ import sys
 import os
 from PySide6.QtWidgets import QApplication
 
+# 添加项目根目录到路径 (向上两级到达项目根目录)
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 # 添加当前目录到路径
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:

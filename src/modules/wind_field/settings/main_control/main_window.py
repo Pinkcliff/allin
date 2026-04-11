@@ -35,10 +35,13 @@ class MainWindow(QMainWindow):
         # 【新增】初始化撤销栈和状态暂存
         self.undo_stack = QUndoStack(self)
         self.data_before_edit = None
-        
+
         # 调试模式标志
         self.debug_mode = True
-        
+
+        # 【新增】Web同步客户端（延迟初始化，在UI创建后）
+        self.web_sync_client = None
+
         # 时间设置
         self.max_time = 10.0
         self.time_resolution = 0.1
@@ -75,11 +78,14 @@ class MainWindow(QMainWindow):
         self._create_menus()
         self._create_toolbar()
         self._create_statusbar()
-        
-        self._connect_signals()
 
         # 【新增】初始化UDP发送器
         self._init_udp_sender()
+
+        # 【新增】初始化Web同步客户端（必须在UI创建后调用）
+        self._init_web_sync()
+
+        self._connect_signals()
 
         # 【修改】由于默认启用UDP，手动触发一次初始化和日志
         if self.udp_enabled:
@@ -394,6 +400,9 @@ class MainWindow(QMainWindow):
             # 【新增】如果启用了UDP自动发送，则发送数据
             if self.udp_send_on_change:
                 self._send_pwm_data_via_udp(selected_only=True)
+
+            # 【新增】数据变化后立即同步到Web端（事件驱动）
+            self._sync_to_web()
         else:
             self._add_info_message("没有选中的风扇单元")
     
@@ -446,6 +455,31 @@ class MainWindow(QMainWindow):
             self._add_info_message("目标: 100个控制板 (192.168.1.101-200:5001)")
         else:
             self._add_info_message("UDP发送已禁用")
+
+    def _init_web_sync(self):
+        """初始化Web同步客户端"""
+        try:
+            # 延迟导入，避免启动时失败
+            from modules.core.data_sync.web_sync_client import get_web_sync_client
+            self.web_sync_client = get_web_sync_client()
+            self._add_info_message("Web同步客户端已初始化")
+        except Exception as e:
+            self.web_sync_client = None
+            self._add_info_message(f"Web同步客户端初始化失败: {e}")
+
+    def _sync_to_web(self):
+        """同步风扇数据到Web端"""
+        if not self.web_sync_client:
+            self._add_info_message("Web同步未启用：同步客户端未初始化")
+            return
+
+        try:
+            # 直接将numpy数组转换为Python list（0-100 → 0-1000 PWM值）
+            # tolist() 比 Python 循环快得多，且直接产生原生Python类型
+            fan_array = (self.canvas_widget.grid_data * 10).astype(int).tolist()
+            self.web_sync_client.sync_fan_array(fan_array)
+        except Exception as e:
+            self._add_info_message(f"Web同步失败: {e}")
 
     def set_udp_send_on_change(self, enabled: bool):
         """设置数据变化时自动发送"""
@@ -564,11 +598,16 @@ class MainWindow(QMainWindow):
         # 文件操作连接
         self.menu_open_action.triggered.connect(self._open_file)
         self.tool_open_action.triggered.connect(self._open_file)
+
         self.menu_save_action.triggered.connect(self._save_file)
         self.tool_save_action.triggered.connect(self._save_file)
         self.menu_save_as_action.triggered.connect(self._save_as_file)
         self.tool_save_as_action.triggered.connect(self._save_as_file)
         self.menu_exit_action.triggered.connect(self.close)
+
+        # 【新增】模版库窗口信号连接
+        self.template_window.load_template_signal.connect(self._load_template)
+        self.template_window.delete_template_signal.connect(self._delete_template)
         
         # 工具模式连接
         self.menu_selection_action.triggered.connect(self._show_selection_tool)
@@ -674,6 +713,92 @@ class MainWindow(QMainWindow):
         self.template_window.show()
         self.template_window.raise_()
 
+    @Slot(str)
+    def _load_template(self, template_name: str):
+        """
+        加载模版
+
+        Args:
+            template_name: 模版名称
+        """
+        # TODO: 实现从文件加载模版的逻辑
+        # 这里先提供几个预设模版的实现
+        import numpy as np
+
+        # 保存当前状态用于撤销
+        self.data_before_edit = self.canvas_widget.grid_data.copy()
+
+        if template_name == "中心高斯喷流_v1":
+            # 高斯分布模版
+            self._apply_gaussian_template()
+        elif template_name == "左右扫描风_初始":
+            # 左右扫描风模版
+            self._apply_scan_template()
+        elif template_name == "城市峡谷风":
+            # 城市峡谷风模版
+            self._apply_canyon_template()
+        else:
+            self._add_info_message(f"未知模版: {template_name}")
+            return
+
+        # 推送撤销命令
+        self._push_edit_command(f"加载模版: {template_name}")
+
+        # 更新画布
+        self.canvas_widget.update()
+
+        # 【关键】同步到Web端
+        self._sync_to_web()
+
+        # 【新增】如果启用了UDP自动发送，则发送数据
+        if self.udp_send_on_change:
+            self._send_pwm_data_via_udp(selected_only=False)
+
+        self._add_info_message(f"已加载模版: {template_name}")
+
+    @Slot(str)
+    def _delete_template(self, template_name: str):
+        """
+        删除模版
+
+        Args:
+            template_name: 模版名称
+        """
+        # TODO: 实现删除模版文件的逻辑
+        self._add_info_message(f"已删除模版: {template_name}")
+
+    def _apply_gaussian_template(self):
+        """应用高斯分布模版"""
+        import numpy as np
+        center = (20, 20)
+        sigma = 5.0
+        amplitude = 100.0
+
+        y_indices, x_indices = np.indices((40, 40))
+        distance_sq = (x_indices - center[1])**2 + (y_indices - center[0])**2
+        gaussian = amplitude * np.exp(-distance_sq / (2 * sigma**2))
+
+        self.canvas_widget.grid_data[:, :] = gaussian
+
+    def _apply_scan_template(self):
+        """应用左右扫描风模版"""
+        import numpy as np
+        # 创建一个从左到右的渐变
+        x_gradient = np.linspace(0, 100, 40)
+        grid = np.tile(x_gradient, (40, 1))
+        self.canvas_widget.grid_data[:, :] = grid
+
+    def _apply_canyon_template(self):
+        """应用城市峡谷风模版"""
+        import numpy as np
+        # 创建中间高、两边低的分布
+        center = 20
+        width = 10
+        x = np.arange(40)
+        canyon = 100 * np.exp(-((x - center)**2) / (2 * width**2))
+        grid = np.tile(canyon, (40, 1))
+        self.canvas_widget.grid_data[:, :] = grid
+
     @Slot()
     def _show_3d_view(self):
         """打开3D视图窗口"""
@@ -745,12 +870,10 @@ class MainWindow(QMainWindow):
             # 应用函数
             result_grid = func.apply(temp_grid, time=time_value)
 
-            # 更新画布
+            # 更新画布数据
             self.canvas_widget.grid_data = result_grid
-            self.canvas_widget.update_all_cells_from_data()
-            self.canvas_widget.update()
 
-            # 推送撤销命令
+            # 推送撤销命令（redo() 会调用 update_all_cells_from_data，不要重复调用）
             description = f"应用函数: {function_type}"
             if time_value > 0:
                 description += f" (t={time_value:.2f}s)"
@@ -773,6 +896,9 @@ class MainWindow(QMainWindow):
             # 【新增】如果启用了UDP自动发送，则发送数据
             if self.udp_send_on_change:
                 self._send_pwm_data_via_udp(selected_only=False)
+
+            # 同步到Web端
+            self._sync_to_web()
 
         except ImportError as e:
             self._add_info_message(f"错误: 无法导入wind_field_editor模块: {e}")
@@ -916,10 +1042,11 @@ class MainWindow(QMainWindow):
             # 【修复】播放时自动发送UDP数据 - 减少日志输出
             if hasattr(self, 'is_playing') and self.is_playing:
                 if self.udp_enabled and self.udp_send_on_play:
-                    # 【修复】只在实际发送时输出一条简洁日志
-                    # self._add_info_message(f"[播放UDP] t={time_value:.2f}s 开始发送80字节批量数据到100个IP")
                     # 使用80字节批量模式
                     self._send_pwm_data_via_udp(selected_only=False)
+
+                # 同步到Web端
+                self._sync_to_web()
 
         # 【修复】减少调试日志输出频率，避免UI卡顿
         # if self.debug_mode:
@@ -1082,14 +1209,17 @@ class MainWindow(QMainWindow):
         """槽函数：将所有风扇的转速设置为0%并取消所有选择 (支持撤销)"""
         self.data_before_edit = np.copy(self.canvas_widget.grid_data)
         self.canvas_widget.grid_data.fill(0)
-        self.canvas_widget.update_all_cells_from_data()
         # 取消所有选择
         self.canvas_widget.selected_cells.clear()
-        self.canvas_widget.update()
+        # _push_edit_command 会触发 redo()，里面会调用 update_all_cells_from_data()
+        # 不在这里重复调用，避免 3200 次格子更新导致卡顿
         self._push_edit_command("全部清零")
         self._add_info_message("所有风扇转速已清零，选择已取消")
 
-        # 【新增】如果启用了UDP自动发送，则发送数据
+        # 同步到Web端
+        self._sync_to_web()
+
+        # 如果启用了UDP自动发送，则发送数据
         if self.udp_send_on_change:
             self._send_pwm_data_via_udp(selected_only=False)
     

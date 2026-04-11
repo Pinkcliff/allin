@@ -1222,7 +1222,9 @@ def create_fan_dock(main_window):
         import os
 
         # 获取风场设置 main.py 的路径
-        wind_field_main = os.path.join(os.path.dirname(os.path.dirname(__file__)), '风场设置', 'main.py')
+        # 获取项目根目录 (src的上一级)
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        wind_field_main = os.path.join(project_root, 'src', 'modules', 'wind_field', 'settings', 'main.py')
 
         try:
             # 使用当前 Python 解释器启动风场设置程序
