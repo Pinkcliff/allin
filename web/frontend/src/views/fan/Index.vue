@@ -336,7 +336,7 @@ const init3DChart = () => {
         SSAO: { enable: true, radius: 2, intensity: 1 }
       },
       boxWidth: 100,
-      boxHeight: 10,
+      boxHeight: 50,
       boxDepth: 100
     },
     series: [{
