@@ -58,6 +58,9 @@ class Function3DWindow(QMainWindow):
         self._update_timer.setInterval(50)  # 50ms节流，即最多20fps
         self._update_timer.timeout.connect(self._process_pending_update)
 
+        # 播放状态标志 - 播放时禁止鼠标旋转3D视图
+        self._playback_active = False
+
         # 窗口标志
         self.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
 
@@ -162,6 +165,9 @@ class Function3DWindow(QMainWindow):
             # 将canvas添加到布局（在控制面板之前）
             self.centralWidget().layout().insertWidget(1, self.canvas)
 
+            # 安装事件过滤器 - 用于播放时拦截鼠标旋转事件
+            self.canvas.installEventFilter(self)
+
             # 初始绘制一个测试图形
             self._draw_initial_plot()
 
@@ -171,6 +177,39 @@ class Function3DWindow(QMainWindow):
             print(f"[3DWindow] 3D图形初始化错误: {e}")
             import traceback
             traceback.print_exc()
+
+    def set_playback_active(self, active: bool):
+        """设置播放状态 - 播放时禁止3D视图鼠标旋转
+
+        Args:
+            active: True=正在播放，禁止旋转；False=已停止，允许旋转
+        """
+        self._playback_active = active
+        if active:
+            # 播放时：禁用鼠标交互，固定视角
+            if self.canvas is not None:
+                self.canvas.setMouseTracking(False)
+                # 阻止matplotlib的3D交互鼠标事件
+                self.canvas.mpl_disconnect_all = True
+            if self.status_label:
+                self.status_label.setText("播放中 - 3D视图已锁定（旋转已禁用）")
+        else:
+            # 停止时：恢复鼠标交互
+            if self.canvas is not None:
+                self.canvas.setMouseTracking(True)
+                self.canvas.mpl_disconnect_all = False
+            if self.status_label:
+                self.status_label.setText("播放已停止 - 可自由旋转3D视图")
+
+    def eventFilter(self, obj, event):
+        """事件过滤器 - 播放时拦截3D视图的鼠标事件"""
+        if self._playback_active and obj == self.canvas:
+            # 播放时拦截鼠标按下和移动事件，阻止旋转
+            from PySide6.QtCore import QEvent
+            if event.type() in (QEvent.MouseButtonPress, QEvent.MouseMove,
+                                QEvent.MouseButtonDblClick):
+                return True
+        return super().eventFilter(obj, event)
 
     def _draw_initial_plot(self):
         """绘制初始图形 - 优化版本"""

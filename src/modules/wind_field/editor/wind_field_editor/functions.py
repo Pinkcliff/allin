@@ -1040,6 +1040,975 @@ class CustomExpressionFunction(WindFieldFunction):
             return np.zeros_like(grid_data)
 
 
+# ==================== 物理/流体函数 ====================
+
+class VortexFieldFunction(WindFieldFunction):
+    """涡旋场函数
+
+    模拟流体涡旋，中心旋转速度最快，向外衰减
+    公式: z = exp(-r/λ) * (1 - exp(-r²/σ²)) * cos(θ + ωt + r/λ)
+    适用场景: 龙卷风、漩涡、旋转流场
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.decay_length = 8.0   # 衰减长度
+        self.core_radius = 3.0    # 涡核半径
+        self.omega = 2.0          # 旋转角速度
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用涡旋场"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        cr, cc = self.params.center
+        x = np.arange(cols) - cc
+        y = np.arange(rows) - cr
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        R = np.sqrt(X ** 2 + Y ** 2)
+        Theta = np.arctan2(Y, X)
+
+        # 涡旋速度剖面（Rankine涡旋简化）
+        tangential = (1 - np.exp(-R ** 2 / self.core_radius ** 2)) * np.exp(-R / self.decay_length)
+        Z = tangential * np.cos(Theta + self.omega * time + R / self.decay_length)
+
+        Z = (Z + 1) / 2 * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+class TurbulenceFieldFunction(WindFieldFunction):
+    """湍流场函数
+
+    多尺度涡旋叠加模拟湍流
+    适用场景: 大气湍流、复杂风场
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.num_vortices = 5   # 涡旋数量
+        self.base_scale = 5.0
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用湍流场"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        cr, cc = self.params.center
+        x = np.linspace(-5, 5, cols)
+        y = np.linspace(-5, 5, rows)
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        Z = np.zeros_like(X)
+        np.random.seed(42)
+
+        for i in range(self.num_vortices):
+            scale = self.base_scale / (i + 1)
+            vx = np.random.uniform(-3, 3)
+            vy = np.random.uniform(-3, 3)
+            phase = np.random.uniform(0, 2 * np.pi)
+
+            cx = vx + 0.5 * np.sin(time * 0.3 + phase)
+            cy = vy + 0.5 * np.cos(time * 0.3 + phase)
+
+            dx = X - cx
+            dy = Y - cy
+            r = np.sqrt(dx ** 2 + dy ** 2)
+            theta = np.arctan2(dy, dx)
+
+            vortex = (1 - np.exp(-r ** 2 / scale ** 2)) * np.exp(-r / (scale * 2))
+            Z += vortex * np.cos(theta + time * (i + 1) * 0.5 + phase) / (i + 1)
+
+        Z = (Z + 1) / 2 * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+class ConvectionCellFunction(WindFieldFunction):
+    """对流单体函数
+
+    模拟大气对流单体（Rayleigh-Benard对流）
+    适用场景: 热对流、大气环流
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.cell_size = 8.0    # 对流单元大小
+        self.strength = 1.0
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用对流单体"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        x = np.linspace(0, 4 * np.pi, cols)
+        y = np.linspace(0, 4 * np.pi, rows)
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        k = 2 * np.pi / self.cell_size
+        # 对流单元：上升气流和下沉气流交替
+        Z = self.strength * (
+            np.sin(k * X + time * 0.3) * np.sin(k * Y + time * 0.2) +
+            0.5 * np.cos(2 * k * X - time * 0.1) * np.cos(2 * k * Y + time * 0.15)
+        )
+
+        Z = (Z + 1.5) / 3 * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+class DopplerWaveFunction(WindFieldFunction):
+    """多普勒效应波函数
+
+    模拟运动波源产生的多普勒效应
+    适用场景: 运动源波场、声学风场
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.source_speed = 1.5  # 波源运动速度
+        self.wave_speed = 3.0    # 波传播速度
+        self.frequency = 2.0     # 波源频率
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用多普勒效应波"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        cr, cc = self.params.center
+        x = np.arange(cols) - cc
+        y = np.arange(rows) - cr
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        # 波源沿x轴运动
+        sx = self.source_speed * time
+        sy = 0.0
+
+        R = np.sqrt((X - sx) ** 2 + (Y - sy) ** 2)
+
+        # 多普勒效应：前方波长压缩，后方波长拉伸
+        cos_angle = (X - sx) / (R + 0.01)
+        doppler_factor = 1 - (self.source_speed / self.wave_speed) * cos_angle
+
+        Z = np.sin(self.frequency * R * doppler_factor - self.frequency * time) / (R * 0.1 + 1)
+
+        Z = (Z + 1) / 2 * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+# ==================== 高级波动函数 ====================
+
+class BesselWaveFunction(WindFieldFunction):
+    """贝塞尔函数波
+
+    使用贝塞尔函数J0模拟圆对称波动
+    适用场景: 圆形波导、振动膜片
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.order = 0       # 贝塞尔函数阶数
+        self.frequency = 1.0
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用贝塞尔函数波"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        cr, cc = self.params.center
+        x = np.arange(cols) - cc
+        y = np.arange(rows) - cr
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        R = np.sqrt(X ** 2 + Y ** 2)
+
+        try:
+            from scipy.special import jv
+            Z = jv(self.order, self.frequency * R - time)
+        except ImportError:
+            # scipy不可用时使用近似
+            Z = np.cos(self.frequency * R - time - np.pi / 4) / np.sqrt(R * 0.3 + 1)
+
+        Z = (Z + 1) / 2 * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+class ChladniPatternFunction(WindFieldFunction):
+    """克拉德尼图案函数
+
+    模拟振动板上的沙粒图案（Chladni figures）
+    公式: z = cos(nπx) * cos(mπy) ± cos(mπx) * cos(nπy)
+    适用场景: 振动模式分析、声学图案
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.n = 3   # x方向模态数
+        self.m = 2   # y方向模态数
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用克拉德尼图案"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        x = np.linspace(-1, 1, cols)
+        y = np.linspace(-1, 1, rows)
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        n, m = self.n, self.m
+        # 经典克拉德尼图案公式
+        Z = np.cos(n * np.pi * X) * np.cos(m * np.pi * Y) + \
+            np.cos(m * np.pi * X) * np.cos(n * np.pi * Y)
+
+        # 添加时间演化
+        if time > 0:
+            Z *= np.cos(time * 0.5)
+
+        Z = (Z + 2) / 4 * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+class SuperharmonicFunction(WindFieldFunction):
+    """超谐函数（多频叠加）
+
+    多个不同频率的谐波叠加，产生复杂的干涉图案
+    适用场景: 复杂波场模拟、频域分析
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.num_harmonics = 5
+        self.base_freq = 0.5
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用超谐函数"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        cr, cc = self.params.center
+        x = np.arange(cols) - cc
+        y = np.arange(rows) - cr
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        Z = np.zeros_like(X)
+        for n in range(1, self.num_harmonics + 1):
+            freq = self.base_freq * n
+            amplitude = 1.0 / n  # 高次谐波振幅递减
+            phase_x = n * np.pi / 4
+            phase_y = n * np.pi / 6
+
+            Z += amplitude * np.sin(freq * X + phase_x + time * n * 0.3) * \
+                 np.cos(freq * Y + phase_y + time * n * 0.2)
+
+        Z = (Z + 2) / 4 * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+# ==================== 运动/流场函数 ====================
+
+class RotationFieldFunction(WindFieldFunction):
+    """旋转场函数
+
+    整体旋转的风场模式
+    适用场景: 旋转风场、旋风
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.rotation_speed = 1.0
+        self.num_blades = 4    # 旋转叶片数
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用旋转场"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        cr, cc = self.params.center
+        x = np.arange(cols) - cc
+        y = np.arange(rows) - cr
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        R = np.sqrt(X ** 2 + Y ** 2)
+        Theta = np.arctan2(Y, X)
+
+        # 旋转叶片
+        Z = np.cos(self.num_blades * (Theta - self.rotation_speed * time))
+        # 径向衰减
+        Z *= np.exp(-R / 20)
+
+        Z = (Z + 1) / 2 * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+class ConvergenceFieldFunction(WindFieldFunction):
+    """收敛场函数
+
+    从四方向中心汇聚的流场
+    适用场景: 气流汇聚、进气口模拟
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.convergence_rate = 1.0
+        self.pulse_freq = 0.5
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用收敛场"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        cr, cc = self.params.center
+        x = np.arange(cols) - cc
+        y = np.arange(rows) - cr
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        R = np.sqrt(X ** 2 + Y ** 2)
+        max_r = np.max(R) + 1
+
+        # 从外向内传播的波前
+        wave_front = max_r - self.convergence_rate * time * 5
+        wave_front = wave_front % (max_r * 2)
+
+        # 高斯波包在波前处
+        Z = np.exp(-((R - wave_front) ** 2) / 8)
+
+        # 脉动效果
+        Z *= (1 + 0.3 * np.sin(self.pulse_freq * time * 2 * np.pi))
+
+        Z = Z * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+class JetStreamFunction(WindFieldFunction):
+    """急流模式函数
+
+    模拟大气急流的带状强风区域
+    适用场景: 高空急流、带状风流
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.jet_width = 5.0      # 急流宽度
+        self.jet_position = 0.0   # 急流中心位置
+        self.speed = 1.0
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用急流模式"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        cr, cc = self.params.center
+        x = np.arange(cols) - cc
+        y = np.arange(rows) - cr
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        # 急流沿y方向振荡
+        jet_y = self.jet_position + 5 * np.sin(X * 0.1 + time * self.speed * 0.3)
+
+        # 急流中心高斯分布
+        Z = np.exp(-((Y - jet_y) ** 2) / (2 * self.jet_width ** 2))
+
+        # 添加波动
+        Z *= (1 + 0.2 * np.sin(X * 0.2 - time))
+
+        Z = Z * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+# ==================== 脉冲/瞬态函数 ====================
+
+class ExplosionFunction(WindFieldFunction):
+    """爆炸扩散函数
+
+    模拟从中心点向外扩散的爆炸波
+    适用场景: 爆炸波前、脉冲扩散
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.speed = 3.0         # 扩散速度
+        self.decay_rate = 0.5    # 衰减率
+        self.ring_width = 3.0    # 波环宽度
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用爆炸扩散"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        cr, cc = self.params.center
+        x = np.arange(cols) - cc
+        y = np.arange(rows) - cr
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        R = np.sqrt(X ** 2 + Y ** 2)
+        front = self.speed * time
+
+        # 扩散的环形波
+        Z = np.exp(-((R - front) ** 2) / (2 * self.ring_width ** 2))
+        # 衰减
+        Z *= np.exp(-self.decay_rate * time)
+
+        # 多层波纹
+        if front > 5:
+            Z += 0.5 * np.exp(-((R - front * 0.7) ** 2) / (2 * self.ring_width ** 2)) * np.exp(-self.decay_rate * time)
+        if front > 10:
+            Z += 0.3 * np.exp(-((R - front * 0.4) ** 2) / (2 * self.ring_width ** 2)) * np.exp(-self.decay_rate * time)
+
+        Z = Z * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+class TravelingPulseFunction(WindFieldFunction):
+    """行进脉冲函数
+
+    沿指定方向行进的脉冲波
+    适用场景: 定向风脉冲、扫描式送风
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.direction = 0.0     # 行进方向(弧度)
+        self.speed = 2.0         # 行进速度
+        self.pulse_width = 3.0   # 脉冲宽度
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用行进脉冲"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        cr, cc = self.params.center
+        x = np.arange(cols) - cc
+        y = np.arange(rows) - cr
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        # 沿方向的投影距离
+        proj = X * np.cos(self.direction) + Y * np.sin(self.direction)
+        center = self.speed * time
+
+        # 高斯脉冲
+        Z = np.exp(-((proj - center) ** 2) / (2 * self.pulse_width ** 2))
+
+        # 垂直方向限制宽度
+        perp = -X * np.sin(self.direction) + Y * np.cos(self.direction)
+        Z *= np.exp(-perp ** 2 / 50)
+
+        Z = Z * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+# ==================== 几何图案函数 ====================
+
+class StarPatternFunction(WindFieldFunction):
+    """星形图案函数
+
+    多角星形辐射图案
+    适用场景: 星形风场分布、装饰图案
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.num_points = 5      # 星角数量
+        self.inner_ratio = 0.4   # 内外半径比
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用星形图案"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        cr, cc = self.params.center
+        x = np.arange(cols) - cc
+        y = np.arange(rows) - cr
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        R = np.sqrt(X ** 2 + Y ** 2)
+        Theta = np.arctan2(Y, X)
+
+        # 星形边界函数
+        n = self.num_points
+        star_radius = 1 + self.inner_ratio * np.cos(n * (Theta - time * 0.5))
+
+        # 归一化
+        Z = np.exp(-((R / 10 - star_radius) ** 2) / 0.5)
+
+        Z = Z * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+class HexagonalPatternFunction(WindFieldFunction):
+    """六边形蜂窝图案函数
+
+    模拟蜂窝状六边形网格
+    适用场景: 蜂窝分布、周期性六角图案
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.cell_size = 5.0     # 单元格大小
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用六边形蜂窝图案"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        s = self.cell_size
+        x = np.arange(cols, dtype=float)
+        y = np.arange(rows, dtype=float)
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        # 六边形网格坐标变换
+        q = (2.0 / 3 * X) / s
+        r = (-1.0 / 3 * X + np.sqrt(3) / 3 * Y) / s
+
+        # 取小数部分（六边形重复单元）
+        fq = q - np.floor(q)
+        fr = r - np.floor(r)
+
+        # 六边形距离函数
+        Z = np.minimum(np.minimum(np.abs(fq), np.abs(fr)), np.abs(fq + fr - 1))
+
+        # 时间动画
+        if time > 0:
+            Z = Z * (1 + 0.3 * np.sin(time))
+
+        Z = Z * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+class StripeWaveFunction(WindFieldFunction):
+    """条纹波函数
+
+    可变角度的条纹波图案
+    适用场景: 平行条纹风场、栅格扫描
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.angle = 0.0         # 条纹角度(弧度)
+        self.wavelength = 5.0    # 波长
+        self.speed = 1.0
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用条纹波"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        x = np.arange(cols, dtype=float)
+        y = np.arange(rows, dtype=float)
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        # 沿条纹方向的投影
+        proj = X * np.cos(self.angle) + Y * np.sin(self.angle)
+
+        # 条纹波
+        Z = np.sin(2 * np.pi * proj / self.wavelength - self.speed * time)
+
+        # 添加渐变包络
+        envelope = np.exp(-((X - cols / 2) ** 2 + (Y - rows / 2) ** 2) / (cols * rows / 2))
+        Z = Z * (0.7 + 0.3 * envelope)
+
+        Z = (Z + 1) / 2 * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+# ==================== 特殊效果函数 ====================
+
+class BreathingFunction(WindFieldFunction):
+    """呼吸效果函数
+
+    中心区域周期性膨胀收缩，模拟呼吸节奏
+    适用场景: 节律性风场、呼吸式送风
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.breath_period = 4.0   # 呼吸周期(秒)
+        self.max_radius = 15.0     # 最大扩散半径
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用呼吸效果"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        cr, cc = self.params.center
+        x = np.arange(cols) - cc
+        y = np.arange(rows) - cr
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        R = np.sqrt(X ** 2 + Y ** 2)
+
+        # 呼吸周期: 吸气(扩张) -> 呼气(收缩)
+        breath = 0.5 + 0.5 * np.sin(2 * np.pi * time / self.breath_period)
+        current_radius = self.max_radius * breath
+
+        # 平滑的径向分布
+        Z = np.exp(-(R ** 2) / (2 * current_radius ** 2))
+
+        # 添加微弱的波动
+        Z += 0.1 * np.sin(R * 0.5 - time * 2) * np.exp(-R / 20)
+        Z = np.clip(Z, 0, 1)
+
+        Z = Z * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+class WaveCollisionFunction(WindFieldFunction):
+    """波浪碰撞函数
+
+    两组相反方向传播的波发生碰撞
+    适用场景: 波浪交汇、对冲风场
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.num_sources = 3      # 碰撞波源数量
+        self.frequency = 1.0
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用波浪碰撞"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        cr, cc = self.params.center
+        x = np.arange(cols) - cc
+        y = np.arange(rows) - cr
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        Z = np.zeros_like(X)
+
+        for i in range(self.num_sources):
+            angle = 2 * np.pi * i / self.num_sources
+            # 从不同方向来的平面波
+            kx = np.cos(angle) * self.frequency
+            ky = np.sin(angle) * self.frequency
+            Z += np.sin(kx * X + ky * Y - time * 2) / self.num_sources
+
+        # 碰撞区域的增强效果
+        collision_area = np.exp(-(X ** 2 + Y ** 2) / 200)
+        Z = Z * (1 + 0.5 * collision_area)
+
+        Z = (Z + 1.5) / 3 * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+class SeismicWaveFunction(WindFieldFunction):
+    """地震波扩散函数
+
+    模拟地震波从震源向外扩散，包含P波和S波
+    适用场景: 震动传播、脉冲扩散
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.p_wave_speed = 4.0     # P波速度
+        self.s_wave_speed = 2.5     # S波速度
+        self.decay = 0.3
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用地震波扩散"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        cr, cc = self.params.center
+        x = np.arange(cols) - cc
+        y = np.arange(rows) - cr
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        R = np.sqrt(X ** 2 + Y ** 2)
+
+        # P波（压缩波，速度快）
+        p_front = self.p_wave_speed * time
+        Z_p = 0.6 * np.exp(-((R - p_front) ** 2) / 8) * np.exp(-self.decay * time)
+
+        # S波（剪切波，速度慢）
+        s_front = self.s_wave_speed * time
+        Z_s = 0.4 * np.exp(-((R - s_front) ** 2) / 5) * np.exp(-self.decay * time) * \
+              np.sin(3 * np.arctan2(Y, X))
+
+        Z = Z_p + Z_s
+
+        # 震中附近残留振动
+        Z += 0.2 * np.exp(-R / 5) * np.sin(5 * time) * np.exp(-time * 0.2)
+
+        Z = (Z + 1) / 2 * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+class FractalNoiseFunction(WindFieldFunction):
+    """分形噪声函数
+
+    多层八度噪声叠加模拟自然分形
+    适用场景: 自然风场模拟、地形噪声
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.octaves = 5          # 噪声层数
+        self.persistence = 0.5    # 持续度(每层振幅比)
+        self.lacunarity = 2.0     # 空隙度(每层频率倍数)
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用分形噪声"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        x = np.linspace(-5, 5, cols)
+        y = np.linspace(-5, 5, rows)
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        Z = np.zeros_like(X)
+        amplitude = 1.0
+        frequency = 0.3
+        phase_seed = 0.0
+
+        for i in range(self.octaves):
+            # 使用不同频率和相位的正弦波模拟噪声
+            phase_x = phase_seed + i * 1.7
+            phase_y = phase_seed + i * 2.3
+            Z += amplitude * (
+                np.sin(frequency * X + phase_x + time * (0.1 + i * 0.05)) *
+                np.cos(frequency * Y + phase_y + time * (0.08 + i * 0.03)) +
+                0.5 * np.sin(frequency * 1.7 * X + phase_y + time * 0.15) *
+                np.cos(frequency * 1.3 * Y + phase_x + time * 0.12)
+            )
+
+            amplitude *= self.persistence
+            frequency *= self.lacunarity
+            phase_seed += 3.14
+
+        Z_min, Z_max = Z.min(), Z.max()
+        if Z_max > Z_min:
+            Z = (Z - Z_min) / (Z_max - Z_min) * 100 * (self.params.amplitude / 100.0)
+        else:
+            Z = np.zeros_like(Z)
+
+        return self.normalize(Z)
+
+
+class DiamondGridFunction(WindFieldFunction):
+    """钻石网格函数
+
+    45度旋转的菱形网格图案
+    适用场景: 菱形风场分布、旋转网格
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.grid_size = 6.0      # 网格尺寸
+        self.speed = 0.5
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用钻石网格"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        x = np.arange(cols, dtype=float)
+        y = np.arange(rows, dtype=float)
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        # 45度旋转
+        U = (X + Y) / np.sqrt(2)
+        V = (X - Y) / np.sqrt(2)
+
+        s = self.grid_size
+        # 菱形距离函数
+        du = np.abs(np.mod(U + time * self.speed, s) - s / 2)
+        dv = np.abs(np.mod(V + time * self.speed * 0.7, s) - s / 2)
+
+        Z = np.maximum(du, dv) / (s / 2)
+
+        # 反转：网格线为高值
+        Z = 1 - Z
+
+        Z = Z * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+class SolitaryWaveFunction(WindFieldFunction):
+    """孤波函数（KdV方程解）
+
+    模拟KdV方程的孤波解
+    公式: z = A * sech²(k * (x - ct))
+    适用场景: 孤波传播、非线性波
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.amplitude_soliton = 2.0
+        self.speed = 2.0
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用孤波"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        cr, cc = self.params.center
+        x = np.arange(cols) - cc
+        y = np.arange(rows) - cr
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        # 孤波参数
+        A = self.amplitude_soliton
+        k = np.sqrt(A / 12)
+        c = self.speed
+
+        # 主孤波（沿x方向传播）
+        sech_main = 1.0 / np.cosh(k * (X - c * time))
+        Z = A * sech_main ** 2 * np.exp(-Y ** 2 / 100)
+
+        # 第二个较小的孤波（沿45度方向）
+        k2 = np.sqrt(A * 0.5 / 12)
+        proj2 = (X + Y) / np.sqrt(2)
+        sech2 = 1.0 / np.cosh(k2 * (proj2 - c * 0.7 * time))
+        Z += A * 0.5 * sech2 ** 2 * np.exp(-((-X + Y) / np.sqrt(2)) ** 2 / 80)
+
+        Z = Z / (A * 1.5) * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+class CrossWaveFunction(WindFieldFunction):
+    """交叉波函数
+
+    两个正交方向的波叠加形成十字交叉图案
+    适用场景: 十字风场、正交波叠加
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.frequency = 0.5
+        self.blend = 0.5     # 两个波的混合比例
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用交叉波"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        cr, cc = self.params.center
+        x = np.arange(cols) - cc
+        y = np.arange(rows) - cr
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        # x方向波
+        Zx = np.exp(-Y ** 2 / 50) * np.sin(self.frequency * X - time * 2)
+        # y方向波
+        Zy = np.exp(-X ** 2 / 50) * np.sin(self.frequency * Y - time * 2)
+
+        # 混合
+        Z = (1 - self.blend) * Zx + self.blend * Zy
+
+        # 交叉区域增强
+        cross = np.exp(-(X ** 2 + Y ** 2) / 100)
+        Z = Z * (1 + 0.5 * cross)
+
+        Z = (Z + 1.5) / 3 * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+class SchrodingerWaveFunction(WindFieldFunction):
+    """薛定谔波函数
+
+    模拟量子力学中的波函数概率密度分布
+    适用场景: 量子类比、波包演化
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.sigma = 3.0        # 波包宽度
+        self.k = 1.5            # 波数
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用薛定谔波函数"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        cr, cc = self.params.center
+        x = np.arange(cols) - cc
+        y = np.arange(rows) - cr
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        # 波包色散
+        sigma_t = self.sigma * np.sqrt(1 + (time * 0.1) ** 2)
+
+        # 高斯包络
+        envelope = np.exp(-(X ** 2 + Y ** 2) / (2 * sigma_t ** 2))
+
+        # 概率密度 = |ψ|² = 波函数的模平方
+        psi_real = envelope * np.cos(self.k * X + self.k * Y - time)
+        psi_imag = envelope * np.sin(self.k * X + self.k * Y - time)
+        Z = psi_real ** 2 + psi_imag ** 2
+
+        Z = Z / Z.max() * 100 * (self.params.amplitude / 100.0) if Z.max() > 0 else Z
+        return self.normalize(Z)
+
+
+class TidalWaveFunction(WindFieldFunction):
+    """潮汐波函数
+
+    模拟潮汐的周期性涨落
+    适用场景: 潮汐风场、周期性大幅变化
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.tidal_period = 8.0   # 潮汐周期
+        self.num_components = 3   # 潮汐分量数
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用潮汐波"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        cr, cc = self.params.center
+        x = np.arange(cols) - cc
+        y = np.arange(rows) - cr
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        R = np.sqrt(X ** 2 + Y ** 2)
+        Theta = np.arctan2(Y, X)
+
+        Z = np.zeros_like(X)
+        # M2 分潮（主要太阴半日潮）
+        Z += 0.6 * np.cos(2 * Theta - 2 * np.pi * time / self.tidal_period) * np.exp(-R / 30)
+        # S2 分潮（主要太阳半日潮）
+        Z += 0.3 * np.cos(2 * Theta - 2 * np.pi * time / (self.tidal_period * 1.07)) * np.exp(-R / 25)
+        # K1 分潮（日月合成日潮）
+        Z += 0.2 * np.cos(Theta - 2 * np.pi * time / (self.tidal_period * 2)) * np.exp(-R / 35)
+
+        Z = (Z + 1.1) / 2.2 * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
+class PlasmaWaveFunction(WindFieldFunction):
+    """等离子体波函数
+
+    模拟等离子体波的复杂干涉图案
+    适用场景: 等离子风场、科幻效果
+    """
+
+    def __init__(self, params: Optional[FunctionParams] = None):
+        self.params = params or FunctionParams()
+        self.num_modes = 4
+
+    def apply(self, grid_data: np.ndarray, time: float = 0.0) -> np.ndarray:
+        """应用等离子体波"""
+        self.validate_grid(grid_data)
+        rows, cols = grid_data.shape
+
+        x = np.linspace(-np.pi, np.pi, cols)
+        y = np.linspace(-np.pi, np.pi, rows)
+        X, Y = np.meshgrid(x, y, indexing='xy')
+
+        Z = np.zeros_like(X)
+        for i in range(self.num_modes):
+            k = i + 1
+            phase = i * np.pi / 3
+            Z += np.sin(k * X + phase + time * (0.5 + i * 0.1)) * \
+                 np.cos(k * Y + phase + time * (0.3 + i * 0.15))
+
+        # 非线性变换产生等离子效果
+        Z = np.sin(Z * 2 + time) * 0.5 + np.cos(Z * 1.5 - time * 0.7) * 0.5
+
+        Z = (Z + 1) / 2 * 100 * (self.params.amplitude / 100.0)
+        return self.normalize(Z)
+
+
 # ==================== 函数工厂 ====================
 
 class WindFieldFunctionFactory:
@@ -1064,7 +2033,7 @@ class WindFieldFunctionFactory:
         'noise_field': NoiseFieldFunction,
         'polynomial_surface': PolynomialSurfaceFunction,
         'saddle_point': SaddlePointFunction,
-        # 新增函数
+        # 数学曲面
         'hyperbolic_paraboloid': HyperbolicParaboloidFunction,
         'elliptic_paraboloid': EllipticParaboloidFunction,
         'ripple': RippleFunction,
@@ -1076,6 +2045,37 @@ class WindFieldFunctionFactory:
         'torus': TorusFunction,
         'sombrero': SombreroFunction,
         'custom_expression': CustomExpressionFunction,
+        # 物理/流体
+        'vortex_field': VortexFieldFunction,
+        'turbulence_field': TurbulenceFieldFunction,
+        'convection_cell': ConvectionCellFunction,
+        'doppler_wave': DopplerWaveFunction,
+        # 高级波
+        'bessel_wave': BesselWaveFunction,
+        'chladni_pattern': ChladniPatternFunction,
+        'superharmonic': SuperharmonicFunction,
+        # 运动/流场
+        'rotation_field': RotationFieldFunction,
+        'convergence_field': ConvergenceFieldFunction,
+        'jet_stream': JetStreamFunction,
+        # 脉冲/瞬态
+        'explosion': ExplosionFunction,
+        'traveling_pulse': TravelingPulseFunction,
+        # 几何图案
+        'star_pattern': StarPatternFunction,
+        'hexagonal_pattern': HexagonalPatternFunction,
+        'stripe_wave': StripeWaveFunction,
+        'diamond_grid': DiamondGridFunction,
+        # 特殊效果
+        'breathing': BreathingFunction,
+        'wave_collision': WaveCollisionFunction,
+        'seismic_wave': SeismicWaveFunction,
+        'fractal_noise': FractalNoiseFunction,
+        'solitary_wave': SolitaryWaveFunction,
+        'cross_wave': CrossWaveFunction,
+        'schrodinger_wave': SchrodingerWaveFunction,
+        'tidal_wave': TidalWaveFunction,
+        'plasma_wave': PlasmaWaveFunction,
     }
 
     # 函数分类
@@ -1087,6 +2087,13 @@ class WindFieldFunctionFactory:
         '数学曲面': ['polynomial_surface', 'saddle_point', 'hyperbolic_paraboloid',
                      'elliptic_paraboloid', 'sombrero', 'torus'],
         '特殊曲线': ['rose_curve', 'heart_shape', 'butterfly_curve', 'archimedean_spiral'],
+        '物理流体': ['vortex_field', 'turbulence_field', 'convection_cell', 'doppler_wave'],
+        '高级波动': ['bessel_wave', 'chladni_pattern', 'superharmonic', 'solitary_wave'],
+        '运动流场': ['rotation_field', 'convergence_field', 'jet_stream'],
+        '脉冲瞬态': ['explosion', 'traveling_pulse', 'seismic_wave'],
+        '几何图案': ['star_pattern', 'hexagonal_pattern', 'stripe_wave', 'diamond_grid'],
+        '特殊效果': ['breathing', 'wave_collision', 'cross_wave', 'fractal_noise',
+                     'schrodinger_wave', 'tidal_wave', 'plasma_wave'],
         '自定义': ['custom_expression'],
     }
 
@@ -1106,7 +2113,6 @@ class WindFieldFunctionFactory:
         'noise_field': '噪声场 - 随机扰动',
         'polynomial_surface': '多项式曲面 - 数学曲面',
         'saddle_point': '鞍点 - 鞍形分布',
-        # 新增函数描述
         'hyperbolic_paraboloid': '双曲抛物面 - 经典马鞍面',
         'elliptic_paraboloid': '椭圆抛物面 - 抛物碗',
         'ripple': '涟漪 - 水波涟漪效果',
@@ -1118,6 +2124,37 @@ class WindFieldFunctionFactory:
         'torus': '环面 - 环形图案',
         'sombrero': '墨西哥草帽 - sinc曲面',
         'custom_expression': '自定义表达式 - 输入数学公式',
+        # 物理/流体
+        'vortex_field': '涡旋场 - Rankine涡旋旋转流场',
+        'turbulence_field': '湍流场 - 多尺度涡旋叠加',
+        'convection_cell': '对流单体 - Rayleigh-Benard对流',
+        'doppler_wave': '多普勒波 - 运动波源频移效应',
+        # 高级波
+        'bessel_wave': '贝塞尔波 - 圆对称波动J0',
+        'chladni_pattern': '克拉德尼图案 - 振动板沙粒图案',
+        'superharmonic': '超谐函数 - 多频谐波叠加',
+        'solitary_wave': '孤波 - KdV方程孤波解',
+        # 运动/流场
+        'rotation_field': '旋转场 - 整体旋转风场',
+        'convergence_field': '收敛场 - 四方向中心汇聚',
+        'jet_stream': '急流模式 - 带状强风区域',
+        # 脉冲/瞬态
+        'explosion': '爆炸扩散 - 中心向外扩散波',
+        'traveling_pulse': '行进脉冲 - 定向行进脉冲波',
+        'seismic_wave': '地震波 - P波S波复合扩散',
+        # 几何图案
+        'star_pattern': '星形图案 - 多角星形辐射',
+        'hexagonal_pattern': '六边形蜂窝 - 蜂窝网格图案',
+        'stripe_wave': '条纹波 - 可变角度平行条纹',
+        'diamond_grid': '钻石网格 - 45度菱形网格',
+        # 特殊效果
+        'breathing': '呼吸效果 - 节律性膨胀收缩',
+        'wave_collision': '波浪碰撞 - 多方向波交汇',
+        'cross_wave': '交叉波 - 正交方向波叠加',
+        'fractal_noise': '分形噪声 - 多层八度噪声',
+        'schrodinger_wave': '薛定谔波 - 量子波函数概率密度',
+        'tidal_wave': '潮汐波 - 周期性潮汐涨落',
+        'plasma_wave': '等离子体波 - 非线性干涉图案',
     }
 
     @classmethod
@@ -1183,7 +2220,7 @@ __all__ = [
     'NoiseFieldFunction',
     'PolynomialSurfaceFunction',
     'SaddlePointFunction',
-    # 新增函数类
+    # 数学曲面
     'HyperbolicParaboloidFunction',
     'EllipticParaboloidFunction',
     'RippleFunction',
@@ -1195,6 +2232,37 @@ __all__ = [
     'TorusFunction',
     'SombreroFunction',
     'CustomExpressionFunction',
+    # 物理/流体
+    'VortexFieldFunction',
+    'TurbulenceFieldFunction',
+    'ConvectionCellFunction',
+    'DopplerWaveFunction',
+    # 高级波
+    'BesselWaveFunction',
+    'ChladniPatternFunction',
+    'SuperharmonicFunction',
+    'SolitaryWaveFunction',
+    # 运动/流场
+    'RotationFieldFunction',
+    'ConvergenceFieldFunction',
+    'JetStreamFunction',
+    # 脉冲/瞬态
+    'ExplosionFunction',
+    'TravelingPulseFunction',
+    'SeismicWaveFunction',
+    # 几何图案
+    'StarPatternFunction',
+    'HexagonalPatternFunction',
+    'StripeWaveFunction',
+    'DiamondGridFunction',
+    # 特殊效果
+    'BreathingFunction',
+    'WaveCollisionFunction',
+    'CrossWaveFunction',
+    'FractalNoiseFunction',
+    'SchrodingerWaveFunction',
+    'TidalWaveFunction',
+    'PlasmaWaveFunction',
     # 工厂类
     'WindFieldFunctionFactory',
     # 参数类

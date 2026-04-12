@@ -52,55 +52,73 @@
       </el-col>
     </el-row>
 
-    <!-- 风扇阵列 -->
-    <div class="card fan-array-card">
-      <div class="card-header">
-        <span>风扇阵列 40 x 40</span>
-        <div class="header-actions">
-          <el-button size="small" text @click="toggleAreaMode">
-            {{ areaMode ? '退出区域模式' : '区域选择' }}
-          </el-button>
-          <el-button size="small" text @click="clearSelection" v-if="selectedCells.size > 0">
-            清除 ({{ selectedCells.size }})
-          </el-button>
-        </div>
-      </div>
-      <div class="card-body fan-grid-wrap">
-        <div class="fan-grid" :class="{ 'area-mode': areaMode }">
-          <div v-for="(row, y) in fanArray" :key="y" class="fan-row">
-            <div
-              v-for="(cell, x) in row" :key="`${x}-${y}`"
-              class="fan-cell"
-              :class="{ active: cell > 0, selected: isCellSelected(x, y) }"
-              :style="getCellStyle(cell)"
-              @click="handleCellClick(x, y)"
-              @mouseenter="handleCellEnter(x, y)"
-            />
+    <!-- 风扇阵列 + 3D视图 -->
+    <el-row :gutter="16">
+      <el-col :span="14">
+        <div class="card fan-array-card">
+          <div class="card-header">
+            <span>风扇阵列 40 x 40</span>
+            <div class="header-actions">
+              <el-button size="small" text @click="toggleAreaMode">
+                {{ areaMode ? '退出区域模式' : '区域选择' }}
+              </el-button>
+              <el-button size="small" text @click="clearSelection" v-if="selectedCells.size > 0">
+                清除 ({{ selectedCells.size }})
+              </el-button>
+            </div>
+          </div>
+          <div class="card-body fan-grid-wrap">
+            <div class="fan-grid" :class="{ 'area-mode': areaMode }">
+              <div v-for="(row, y) in fanArray" :key="y" class="fan-row">
+                <div
+                  v-for="(cell, x) in row" :key="`${x}-${y}`"
+                  class="fan-cell"
+                  :class="{ active: cell > 0, selected: isCellSelected(x, y) }"
+                  :style="getCellStyle(cell)"
+                  @click="handleCellClick(x, y)"
+                  @mouseenter="handleCellEnter(x, y)"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- 区域控制 -->
+          <div v-if="areaMode || selectedCells.size > 0" class="area-panel">
+            <div class="area-panel-title">
+              区域控制
+              <span v-if="selectedCells.size > 0">（已选择 {{ selectedCells.size }} 个风扇）</span>
+            </div>
+            <div class="area-panel-body">
+              <el-form :inline="true">
+                <el-form-item label="转速">
+                  <el-slider v-model="areaRpm" :min="0" :max="15000" :step="100"
+                    style="width: 260px" />
+                  <el-input-number v-model="areaRpm" :min="0" :max="15000" :step="100"
+                    style="width: 110px; margin-left: 10px" />
+                </el-form-item>
+                <el-form-item>
+                  <el-button type="primary" @click="applyAreaControl" :loading="loading">应用</el-button>
+                </el-form-item>
+              </el-form>
+            </div>
           </div>
         </div>
-      </div>
+      </el-col>
 
-      <!-- 区域控制 -->
-      <div v-if="areaMode || selectedCells.size > 0" class="area-panel">
-        <div class="area-panel-title">
-          区域控制
-          <span v-if="selectedCells.size > 0">（已选择 {{ selectedCells.size }} 个风扇）</span>
+      <el-col :span="10">
+        <div class="card fan-3d-card">
+          <div class="card-header">
+            <span>3D 风场视图</span>
+            <div class="header-actions">
+              <el-button size="small" text @click="reset3DView">重置视角</el-button>
+            </div>
+          </div>
+          <div class="card-body" style="padding: 8px;">
+            <div ref="chart3dRef" class="chart-3d-container"></div>
+          </div>
         </div>
-        <div class="area-panel-body">
-          <el-form :inline="true">
-            <el-form-item label="转速">
-              <el-slider v-model="areaRpm" :min="0" :max="15000" :step="100"
-                style="width: 260px" />
-              <el-input-number v-model="areaRpm" :min="0" :max="15000" :step="100"
-                style="width: 110px; margin-left: 10px" />
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" @click="applyAreaControl" :loading="loading">应用</el-button>
-            </el-form-item>
-          </el-form>
-        </div>
-      </div>
-    </div>
+      </el-col>
+    </el-row>
 
     <!-- 单风扇设置 -->
     <el-dialog v-model="singleFanDialogVisible" title="单风扇设置" width="400px">
@@ -123,10 +141,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { fanApi } from '@/api/data'
 import { wsClient } from '@/websocket/client'
+import * as echarts from 'echarts'
+import 'echarts-gl'
 
 const fanStatus = ref(null)
 const fanArray = ref([])
@@ -139,6 +159,12 @@ const areaRpm = ref(5000)
 const singleFanDialogVisible = ref(false)
 const singleFanForm = ref({ x: 0, y: 0, rpm: 5000 })
 
+// 3D 图表相关
+const chart3dRef = ref(null)
+let chart3d = null
+let updateTimer3d = null
+let pendingUpdate3d = false
+
 const handleFanUpdate = (data) => {
   if (data.fan_array) fanArray.value = data.fan_array
   if (data.active_fans !== undefined) {
@@ -146,6 +172,8 @@ const handleFanUpdate = (data) => {
     fanStatus.value.active_fans = data.active_fans
     fanStatus.value.total_fans = data.total_fans || 1600
   }
+  // 标记需要更新3D视图
+  pendingUpdate3d = true
 }
 
 const initFanArray = () => {
@@ -184,7 +212,7 @@ const setAllPower = async (on) => {
 }
 
 const refreshStatus = async () => {
-  try { const r = await fanApi.getStatus(); fanStatus.value = r; fanArray.value = r.fan_array }
+  try { const r = await fanApi.getStatus(); fanStatus.value = r; fanArray.value = r.fan_array; pendingUpdate3d = true }
   catch { ElMessage.error('获取状态失败') }
 }
 
@@ -237,8 +265,167 @@ const applyTemplate = async () => {
   finally { loading.value = false }
 }
 
-onMounted(() => { initFanArray(); refreshStatus(); wsClient.on('fan_update', handleFanUpdate) })
-onUnmounted(() => { wsClient.off('fan_update', handleFanUpdate) })
+// ==================== 3D视图相关 ====================
+
+const init3DChart = () => {
+  if (!chart3dRef.value) return
+  chart3d = echarts.init(chart3dRef.value)
+
+  const option = {
+    tooltip: {
+      formatter: (params) => {
+        const d = params.data
+        return `位置: (${d[0]}, ${d[1]})<br/>转速: ${d[2].toFixed(1)}%`
+      }
+    },
+    visualMap: {
+      show: true,
+      min: 0,
+      max: 100,
+      inRange: {
+        color: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#fee090',
+                '#fdae61', '#f46d43', '#d73027', '#a50026']
+      },
+      text: ['高', '低'],
+      textStyle: { color: '#aaa' },
+      right: 10,
+      top: 'center',
+      itemHeight: 120
+    },
+    xAxis3D: {
+      type: 'value',
+      name: 'X',
+      min: 0,
+      max: 39,
+      nameTextStyle: { color: '#aaa' }
+    },
+    yAxis3D: {
+      type: 'value',
+      name: 'Y',
+      min: 0,
+      max: 39,
+      nameTextStyle: { color: '#aaa' }
+    },
+    zAxis3D: {
+      type: 'value',
+      name: '转速%',
+      min: 0,
+      max: 100,
+      nameTextStyle: { color: '#aaa' }
+    },
+    grid3D: {
+      viewControl: {
+        projection: 'perspective',
+        autoRotate: false,
+        distance: 180,
+        alpha: 25,
+        beta: 40
+      },
+      light: {
+        main: {
+          intensity: 1.2,
+          shadow: true
+        },
+        ambient: {
+          intensity: 0.3
+        }
+      },
+      postEffect: {
+        enable: true,
+        bloom: { enable: false },
+        SSAO: { enable: true, radius: 2, intensity: 1 }
+      },
+      boxWidth: 100,
+      boxHeight: 10,
+      boxDepth: 100
+    },
+    series: [{
+      type: 'surface',
+      wireframe: { show: false },
+      shading: 'realistic',
+      realisticMaterial: {
+        roughness: 0.6,
+        metalness: 0
+      },
+      itemStyle: {
+        opacity: 0.9
+      },
+      data: []
+    }]
+  }
+
+  chart3d.setOption(option)
+
+  // 响应窗口大小变化
+  window.addEventListener('resize', handleResize3d)
+}
+
+const update3DChart = () => {
+  if (!chart3d || !fanArray.value || fanArray.value.length === 0) return
+
+  // 构建表面数据 - echarts-gl surface 需要的数据格式
+  const data = []
+  for (let y = 0; y < 40; y++) {
+    for (let x = 0; x < 40; x++) {
+      const val = fanArray.value[y]?.[x] || 0
+      // 将 PWM (0-1000) 转换为百分比 (0-100)
+      const percent = Math.min(100, Math.max(0, val / 10))
+      data.push([x, y, percent])
+    }
+  }
+
+  chart3d.setOption({
+    series: [{
+      data: data
+    }]
+  })
+}
+
+const reset3DView = () => {
+  if (!chart3d) return
+  chart3d.setOption({
+    grid3D: {
+      viewControl: {
+        distance: 180,
+        alpha: 25,
+        beta: 40
+      }
+    }
+  })
+}
+
+const handleResize3d = () => {
+  if (chart3d) chart3d.resize()
+}
+
+// 节流更新3D视图（每200ms最多更新一次）
+const start3DUpdateLoop = () => {
+  updateTimer3d = setInterval(() => {
+    if (pendingUpdate3d) {
+      pendingUpdate3d = false
+      update3DChart()
+    }
+  }, 200)
+}
+
+onMounted(async () => {
+  initFanArray()
+  await refreshStatus()
+
+  await nextTick()
+  init3DChart()
+  update3DChart()
+  start3DUpdateLoop()
+
+  wsClient.on('fan_update', handleFanUpdate)
+})
+
+onUnmounted(() => {
+  wsClient.off('fan_update', handleFanUpdate)
+  window.removeEventListener('resize', handleResize3d)
+  if (updateTimer3d) clearInterval(updateTimer3d)
+  if (chart3d) { chart3d.dispose(); chart3d = null }
+})
 </script>
 
 <style scoped>
@@ -292,6 +479,23 @@ onUnmounted(() => { wsClient.off('fan_update', handleFanUpdate) })
 .fan-cell.selected {
   border-color: var(--accent) !important;
   box-shadow: 0 0 4px var(--accent-glow);
+}
+
+/* 3D视图卡片 */
+.fan-3d-card {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.fan-3d-card .card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.chart-3d-container {
+  width: 100%;
+  height: 460px;
+  min-height: 300px;
 }
 
 /* 区域控制面板 */

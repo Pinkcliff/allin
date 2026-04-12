@@ -1057,18 +1057,26 @@ class MainWindow(QMainWindow):
         """播放状态变化时的处理"""
         self.is_playing = is_playing  # 记录播放状态
 
+        # 【关键优化】设置UDP发送器的播放模式标志
+        # 播放时跳过磁盘日志记录，大幅提升发送速度
+        if self.udp_sender is not None:
+            self.udp_sender.playback_mode = is_playing
+
+        # 【新增】3D视图播放时禁止旋转
+        if hasattr(self, 'function_3d_view') and self.function_3d_view:
+            d3d_window = self.function_3d_view.d3d_window
+            if d3d_window:
+                d3d_window.set_playback_active(is_playing)
+
         status = "播放" if is_playing else "暂停"
         self._add_info_message(f"时间条{status}")
 
-        # 【新增】播放开始/停止时的日志
         if is_playing:
             self._add_info_message("=== 播放开始 ===")
             if self.udp_enabled and self.udp_send_on_play:
-                self._add_info_message("播放时自动发送UDP数据: 已启用（80字节批量模式）")
-                self._add_info_message(f"将每隔 {self.time_resolution}s 发送一次数据")
-                # 【新增】播放开始时立即发送一次当前数据
+                self._add_info_message("播放时自动发送UDP数据: 已启用（高速模式）")
+                self._add_info_message(f"将每隔 {self.time_resolution}s 发送一次数据（跳过日志记录）")
                 if hasattr(self, 'current_function_params') and self.current_function_params:
-                    self._add_info_message("[播放UDP] 播放开始，立即发送当前帧数据（80字节×100IP）")
                     self._send_pwm_data_via_udp(selected_only=False)
             else:
                 if self.udp_enabled:

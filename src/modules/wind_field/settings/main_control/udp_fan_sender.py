@@ -185,6 +185,9 @@ class FanUDPSender:
         self.csv_file = None
         self._init_csv_file()
 
+        # 【新增】播放模式标志 - 播放时跳过磁盘日志，大幅提升发送速度
+        self.playback_mode = False
+
         # 原始数据TXT文件路径
         self.raw_data_file = None
         self._init_raw_data_file()
@@ -686,12 +689,8 @@ class FanUDPSender:
         """
         使用80字节批量包将40x40的网格数据发送到所有电驱板
 
-        新协议：每次向一个IP发送80字节（16个风扇 × 5字节，前2字节固定00）
-
-        网格布局:
-        - 40x40网格分为10x10个模块
-        - 每个模块4x4，对应一个电驱板的16个风扇
-        - 10个链路，每个链路10个板（共100个板）
+        播放模式下跳过所有磁盘日志记录，实现高速发送。
+        正常模式下保留完整的CSV和TXT日志记录。
 
         Args:
             grid_data: 40x40的numpy数组，值为0-100的百分比
@@ -706,9 +705,10 @@ class FanUDPSender:
                     self.logger.error(f"网格数据形状错误: {grid_data.shape if grid_data is not None else 'None'}, 需要(40, 40)")
                 return {}
 
-            if self.enable_logging and self.logger:
+            is_playback = self.playback_mode
+
+            if self.enable_logging and self.logger and not is_playback:
                 self.logger.info(f"开始发送100个控制板数据（80字节批量包） (范围: {grid_data.min():.1f}%-{grid_data.max():.1f}%)")
-                # 【调试】打印第一个板的数据包内容
                 self.logger.info(f"调试: 板ID 0 的80字节数据包预览:")
                 first_board_pwm = []
                 for fan_id in range(16):
@@ -718,28 +718,20 @@ class FanUDPSender:
                     pwm = int((percent / 100.0) * 999)
                     first_board_pwm.append(pwm)
                 self.logger.info(f"  PWM值: {first_board_pwm}")
-                self.logger.info(f"  风扇ID映射: fan_id 0-3 = 第0行, fan_id 4-7 = 第1行, fan_id 8-11 = 第2行, fan_id 12-15 = 第3行")
 
             results = {}
             success_count = 0
             fail_count = 0
             start_time = time.time()
 
-            # 遍历所有链路和板（IP从1-100）
+            # 【优化】预计算所有板的PWM值（避免在循环中重复计算）
+            # 40x40网格分为10x10个4x4模块，共100个板
+            all_pwm_values = []
             for global_board_id in range(100):
-                chain_id = global_board_id // 10
-                board_in_chain = global_board_id % 10
-
-                # 提取模块的4x4风扇数据
                 row_start = global_board_id // 10 * 4
-                row_end = row_start + 4
                 col_start = (global_board_id % 10) * 4
-                col_end = col_start + 4
+                module_data = grid_data[row_start:row_start + 4, col_start:col_start + 4]
 
-                module_data = grid_data[row_start:row_end, col_start:col_end]
-
-                # 构建16个风扇的PWM值列表（按逻辑风扇ID顺序）
-                # pwm_values[i] = 逻辑风扇i的PWM值
                 pwm_values = []
                 for logical_fan_id in range(16):
                     row = logical_fan_id // 4
@@ -747,19 +739,22 @@ class FanUDPSender:
                     percent = module_data[row, col]
                     pwm_value = int((percent / 100.0) * PROTOCOL_CONFIG['pwm_max'])
                     pwm_values.append(pwm_value)
+                all_pwm_values.append(pwm_values)
 
-                # 构建80字节数据包（会自动将逻辑PWM值映射到物理风扇位置）
+            # 遍历所有板发送数据
+            for global_board_id in range(100):
+                chain_id = global_board_id // 10
+                board_in_chain = global_board_id % 10
+                pwm_values = all_pwm_values[global_board_id]
+
+                # 构建80字节数据包
                 packet = self._build_bulk_packet(chain_id, board_in_chain, pwm_values)
 
-                # 检查数据包是否有效
                 if not packet or len(packet) != 80:
-                    if self.enable_logging and self.logger:
-                        self.logger.error(f"数据包构建失败: 板ID={global_board_id}, 长度={len(packet) if packet else 0}")
                     results[global_board_id] = False
                     fail_count += 1
                     continue
 
-                # 发送到对应IP
                 try:
                     target_ip = self._get_board_ip(global_board_id)
                     target_addr = (target_ip, self.udp_port)
@@ -772,12 +767,11 @@ class FanUDPSender:
                     results[global_board_id] = True
                     success_count += 1
 
-                    # 记录每个风扇的数据（CSV格式）
-                    for fan_id in range(16):
-                        self._log_fan_data(target_ip, fan_id, chain_id, board_in_chain, pwm_values[fan_id])
-
-                    # 记录原始数据包（TXT格式）
-                    self._log_raw_data(target_ip, self.udp_port, packet, 'bulk')
+                    # 【关键优化】播放模式下跳过所有磁盘日志记录
+                    if not is_playback:
+                        for fan_id in range(16):
+                            self._log_fan_data(target_ip, fan_id, chain_id, board_in_chain, pwm_values[fan_id])
+                        self._log_raw_data(target_ip, self.udp_port, packet, 'bulk')
 
                 except Exception as e:
                     self.stats['total_packets'] += 1
@@ -789,16 +783,14 @@ class FanUDPSender:
 
             # 批量发送完成
             elapsed_time = time.time() - start_time
-            if self.enable_logging and self.logger:
+            if self.enable_logging and self.logger and not is_playback:
                 self.logger.info(f"发送完成: {success_count}成功/{fail_count}失败, 耗时{elapsed_time*1000:.0f}ms")
 
-            # 批量回调（使用Qt的信号机制在主线程中调用）
             if callback:
                 try:
                     callback(success_count, fail_count, elapsed_time)
                 except Exception as cb_error:
-                    if self.enable_logging and self.logger:
-                        self.logger.error(f"回调函数执行失败: {cb_error}")
+                    pass
 
             return results
 
