@@ -60,3 +60,5 @@ renumber_tables.py
 # OS
 .DS_Store
 Thumbs.db
+src/modules/wind_field/data/fan_data_*.csv
+src/modules/wind_field/data/raw_data_*.txt
