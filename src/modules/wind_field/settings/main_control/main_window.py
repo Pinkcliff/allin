@@ -90,7 +90,7 @@ class MainWindow(QMainWindow):
         # 【修改】由于默认启用UDP，手动触发一次初始化和日志
         if self.udp_enabled:
             self._add_info_message("UDP发送已启用（默认）")
-            self._add_info_message("目标: 100个控制板 (192.168.1.101-200:5001)")
+            self._add_info_message("目标: 10个IP (192.168.1.100-109:6005), 每IP管10组风扇")
 
     def _init_tool_widgets(self):
         """初始化所有工具面板的QWidget"""
@@ -452,7 +452,7 @@ class MainWindow(QMainWindow):
                     self.udp_sender.start()
                     self._add_info_message("UDP后台发送线程已启动")
             self._add_info_message("UDP发送已启用")
-            self._add_info_message("目标: 100个控制板 (192.168.1.101-200:5001)")
+            self._add_info_message("目标: 10个IP (192.168.1.100-109:6005), 每IP管10组风扇")
         else:
             self._add_info_message("UDP发送已禁用")
 
