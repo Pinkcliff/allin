@@ -190,6 +190,9 @@ class FanUDPSender:
         self.raw_data_file = None
         self._init_raw_data_file()
 
+        # 【协议验证日志】独立文件，记录每次发包的完整验证信息
+        self.verify_log_file = os.path.join(self.data_dir, f'protocol_verify_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
+
         if self.enable_logging and self.logger:
             self.logger.info('=' * 60)
             self.logger.info('FanUDPSender 初始化完成 (协议: 651字节 AA...CC)')
@@ -250,6 +253,145 @@ class FanUDPSender:
         except Exception as e:
             if self.enable_logging and self.logger:
                 self.logger.warning(f"初始化原始数据文件失败: {e}")
+
+    def _verify_log(self, msg: str):
+        """写入协议验证日志（线程安全，独立文件）"""
+        try:
+            with self.csv_lock:
+                with open(self.verify_log_file, 'a', encoding='utf-8') as f:
+                    f.write(msg + '\n')
+        except Exception:
+            pass
+
+    def _verify_packet(self, packet: bytes, boards_pwm_data: dict, caller: str):
+        """
+        验证并记录651字节协议包的完整内容
+
+        检查项:
+          1. 包长度 = 651
+          2. 帧头 = 0xAA
+          3. 帧尾 = 0xCC
+          4. 帧号小端序正确
+          5. 帧类型 = 0x01
+          6. 链路ID = 0x00
+          7. 电驱板ID = 0x00
+          8. 数据长度 = 640 (大端序)
+          9. 每个风扇的PWM值小端序正确
+          10. 与fan_control.py格式一致性
+        """
+        ts = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+        issues = []
+
+        self._verify_log(f"\n{'='*80}")
+        self._verify_log(f"[{ts}] 协议验证 - 调用方: {caller}")
+        self._verify_log(f"{'='*80}")
+
+        # 1. 包长度
+        pkt_len = len(packet)
+        self._verify_log(f"[检查1] 包长度: {pkt_len} 字节 (期望651)")
+        if pkt_len != 651:
+            issues.append(f"包长度错误: {pkt_len} != 651")
+
+        # 2. 帧头
+        header = packet[0]
+        self._verify_log(f"[检查2] 帧头: 0x{header:02X} (期望0xAA)")
+        if header != 0xAA:
+            issues.append(f"帧头错误: 0x{header:02X} != 0xAA")
+
+        # 3. 帧号(小端序4字节)
+        frame_num = struct.unpack_from('<I', packet, 1)[0]
+        self._verify_log(f"[检查3] 帧号: {frame_num} (小端序字节: {packet[1]:02X} {packet[2]:02X} {packet[3]:02X} {packet[4]:02X})")
+
+        # 4. 帧类型
+        ftype = packet[5]
+        self._verify_log(f"[检查4] 帧类型: 0x{ftype:02X} (期望0x01)")
+        if ftype != 0x01:
+            issues.append(f"帧类型错误: 0x{ftype:02X} != 0x01")
+
+        # 5. 链路ID
+        link = packet[6]
+        self._verify_log(f"[检查5] 链路ID: {link} (期望0x00)")
+        if link != 0x00:
+            issues.append(f"链路ID错误: {link} != 0x00")
+
+        # 6. 电驱板ID
+        bid = packet[7]
+        self._verify_log(f"[检查6] 电驱板ID: {bid} (期望0x00)")
+        if bid != 0x00:
+            issues.append(f"电驱板ID错误: {bid} != 0x00 (应为固定0x00)")
+
+        # 7. 数据长度(大端序)
+        dlen = struct.unpack_from('>H', packet, 8)[0]
+        self._verify_log(f"[检查7] 数据长度: {dlen} (大端序字节: {packet[8]:02X} {packet[9]:02X}, 期望640)")
+        if dlen != 640:
+            issues.append(f"数据长度错误: {dlen} != 640")
+
+        # 8. 帧尾
+        tail = packet[650]
+        self._verify_log(f"[检查8] 帧尾: 0x{tail:02X} (期望0xCC)")
+        if tail != 0xCC:
+            issues.append(f"帧尾错误: 0x{tail:02X} != 0xCC")
+
+        # 9. 完整hex前20字节
+        hex_prefix = ' '.join(f'{b:02X}' for b in packet[:20])
+        self._verify_log(f"[头部HEX] {hex_prefix}")
+
+        # 10. 逐板验证PWM数据
+        self._verify_log(f"\n[数据区验证] 输入板数: {len(boards_pwm_data)}")
+        for board_id in sorted(boards_pwm_data.keys()):
+            input_pwm = boards_pwm_data[board_id]
+            board_offset = board_id * 64
+
+            self._verify_log(f"\n  板{board_id} (数据区偏移={board_offset}):")
+            self._verify_log(f"    输入PWM值: {input_pwm}")
+
+            for fan_id in range(16):
+                # 期望值
+                expected_pwm = max(0, min(1000, input_pwm[fan_id])) if fan_id < len(input_pwm) else 0
+
+                # 从包中读回的值(小端序)
+                pkt_offset = 10 + board_offset + fan_id * 4
+                read_pwm = struct.unpack_from('<H', packet, pkt_offset)[0]
+                read_pwm_copy = struct.unpack_from('<H', packet, pkt_offset + 2)[0]
+
+                # 原始字节
+                raw_bytes = ' '.join(f'{packet[pkt_offset+i]:02X}' for i in range(4))
+
+                if expected_pwm > 0 or read_pwm > 0:
+                    self._verify_log(
+                        f"    风扇{fan_id:2d}: 期望PWM={expected_pwm:4d}, "
+                        f"包中读回={read_pwm:4d}(副本={read_pwm_copy:4d}), "
+                        f"字节=[{raw_bytes}]"
+                    )
+
+                    if read_pwm != expected_pwm:
+                        issues.append(f"板{board_id}风扇{fan_id}: PWM不匹配 期望={expected_pwm} 实际={read_pwm}")
+                    if read_pwm != read_pwm_copy:
+                        issues.append(f"板{board_id}风扇{fan_id}: 副本不匹配 值={read_pwm} 副本={read_pwm_copy}")
+
+        # 11. 与fan_control.py对比验证
+        self._verify_log(f"\n[对比fan_control.py]")
+        # fan_control.py使用struct.pack构建，验证我们的包格式一致
+        # 检查头部10字节结构: AA + <I帧号 + B帧类型 + B链路 + B板ID + >H数据长度
+        fc_header = struct.pack('B', 0xAA) + struct.pack('<I', frame_num) + struct.pack('B', 0x01) + struct.pack('B', 0x00) + struct.pack('B', 0x00) + struct.pack('>H', 640)
+        our_header = packet[:10]
+        match = fc_header == our_header
+        self._verify_log(f"    头部与fan_control.py格式一致: {'✓' if match else '✗'}")
+        if not match:
+            issues.append(f"头部格式与fan_control.py不一致")
+            self._verify_log(f"    期望头部: {' '.join(f'{b:02X}' for b in fc_header)}")
+            self._verify_log(f"    实际头部: {' '.join(f'{b:02X}' for b in our_header)}")
+
+        # 总结
+        self._verify_log(f"\n[验证结果] 发现问题数: {len(issues)}")
+        if issues:
+            self._verify_log("[问题列表]")
+            for i, issue in enumerate(issues, 1):
+                self._verify_log(f"  {i}. {issue}")
+        else:
+            self._verify_log("  所有检查通过 ✓")
+
+        return issues
 
     def _build_chain_packet(self, boards_pwm_data: dict) -> bytes:
         """
@@ -441,6 +583,9 @@ class FanUDPSender:
             boards_data = {board_id: pwm_values}
             packet = self._build_chain_packet(boards_data)
 
+            # 协议验证日志
+            self._verify_packet(packet, boards_data, f"send_to_board(链路{chain_id},板{board_id},风扇{fan_id})")
+
             target_ip = self._get_chain_ip(chain_id)
             target_addr = (target_ip, self.udp_port)
             self.sock.sendto(packet, target_addr)
@@ -574,6 +719,10 @@ class FanUDPSender:
 
             try:
                 packet = self._build_chain_packet(boards_pwm_data)
+
+                # 协议验证日志
+                self._verify_packet(packet, boards_pwm_data, f"send_to_selected_boards(链路{chain_id})")
+
                 target_ip = self._get_chain_ip(chain_id)
                 target_addr = (target_ip, self.udp_port)
                 self.sock.sendto(packet, target_addr)
@@ -666,6 +815,18 @@ class FanUDPSender:
 
                 # 构建该链路的651字节包
                 packet = self._build_chain_packet(boards_pwm_data)
+
+                # 协议验证日志（仅非播放模式）
+                if not is_playback:
+                    self._verify_packet(packet, boards_pwm_data, f"send_grid_to_boards_bulk(链路{chain_id})")
+                    # 额外记录PWM转换过程
+                    self._verify_log(f"\n[链路{chain_id} PWM转换明细]")
+                    for bid in range(10):
+                        pwm_vals = boards_pwm_data.get(bid, [])
+                        if any(v > 0 for v in pwm_vals):
+                            row_s = (chain_id * 10 + bid) // 10 * 4
+                            col_s = bid * 4
+                            self._verify_log(f"  板{bid} (网格[{row_s}:{row_s+4},{col_s}:{col_s+4}]): PWM={pwm_vals}")
 
                 if not packet or len(packet) != 651:
                     for board_in_chain in range(10):

@@ -38,9 +38,9 @@ class Settings(BaseSettings):
     MOTION_IP: str = "192.168.1.50"
 
     # 风扇控制配置
-    FAN_UDP_START_IP: str = "192.168.1.101"
-    FAN_UDP_END_IP: str = "192.168.1.200"
-    FAN_UDP_PORT: int = 5001
+    FAN_UDP_START_IP: str = "192.168.1.100"
+    FAN_UDP_END_IP: str = "192.168.1.109"
+    FAN_UDP_PORT: int = 6005
 
     class Config:
         env_file = ".env"

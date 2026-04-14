@@ -5,6 +5,10 @@ FastAPI应用入口
 """
 import sys
 import os
+import warnings
+
+# 过滤 snap7 的 pkg_resources 弃用警告（第三方库内部问题）
+warnings.filterwarnings("ignore", message="pkg_resources is deprecated")
 
 # 添加项目根目录到路径
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
