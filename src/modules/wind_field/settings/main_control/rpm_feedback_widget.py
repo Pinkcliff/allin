@@ -33,8 +33,9 @@ class RPMCell(QGraphicsRectItem):
         self.rpm2 = 0
         self._has_data = False
         self.setAcceptHoverEvents(True)
-        self.bg_color = QColor(25, 25, 30)
-        self.text_color = QColor(60, 60, 60)
+        # 默认白色背景（与PWM画布一致）
+        self.bg_color = QColor(255, 255, 255)
+        self.text_color = QColor(0, 0, 0)
         self.setBrush(QBrush(self.bg_color))
         self.setPen(QPen(Qt.NoPen))
 
@@ -43,9 +44,11 @@ class RPMCell(QGraphicsRectItem):
         self.rpm2 = rpm2
         self._has_data = True
         if rpm1 <= 0:
-            self.bg_color = QColor(25, 25, 30)
-            self.text_color = QColor(60, 60, 60)
+            # 0 RPM 也显示颜色（淡蓝，与PWM 0%一致）
+            self.bg_color = utils.value_to_color(0)
+            self.text_color = utils.get_contrasting_text_color(self.bg_color)
         else:
+            # 按RPM比例映射到0-100，使用与PWM相同的颜色表
             ratio = min(rpm1 / 15000.0, 1.0) * 100
             self.bg_color = utils.value_to_color(ratio)
             self.text_color = utils.get_contrasting_text_color(self.bg_color)
@@ -58,8 +61,8 @@ class RPMCell(QGraphicsRectItem):
             return
         painter.setPen(self.text_color)
         painter.setFont(config.CELL_FONT)
-        if self.rpm1 > 0:
-            painter.drawText(self.boundingRect(), Qt.AlignCenter, f"{int(self.rpm1 / 100)}")
+        # 显示RPM值（除以100，3位数字适合格子大小）
+        painter.drawText(self.boundingRect(), Qt.AlignCenter, f"{int(self.rpm1 / 100)}")
 
 
 class RPMFeedbackWindow(QDialog):
@@ -111,6 +114,7 @@ class RPMFeedbackWindow(QDialog):
 
         # 网格视图
         self.scene = QGraphicsScene(self)
+        self.scene.setBackgroundBrush(QBrush(QColor(255, 255, 255)))
         self.view = QGraphicsView(self.scene, self)
         self.view.setRenderHint(QPainter.Antialiasing)
         self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -134,7 +138,7 @@ class RPMFeedbackWindow(QDialog):
         layout.addWidget(self.view)
 
         # 底部说明
-        bottom = QLabel("颜色: 低速(淡蓝) → 中速(绿/黄) → 高速(红)  |  数值: RPM/100  |  转速 = 150000 / 原始值")
+        bottom = QLabel("数值: RPM/100 (如 75 = 7500RPM)  |  颜色: 低(淡蓝) → 中(绿/黄) → 高(红)  |  与PWM画布配色一致")
         bottom.setStyleSheet("color: #555; font-size: 10px;")
         layout.addWidget(bottom)
 
@@ -222,8 +226,14 @@ class RPMFeedbackWindow(QDialog):
         self.rpm_data.fill(0)
         for r in range(config.GRID_DIM):
             for c in range(config.GRID_DIM):
-                self.cells[r][c].set_rpm(0, 0)
-                self.cells[r][c]._has_data = False
+                cell = self.cells[r][c]
+                cell._has_data = False
+                cell.rpm1 = 0
+                cell.rpm2 = 0
+                cell.bg_color = QColor(255, 255, 255)
+                cell.text_color = QColor(0, 0, 0)
+                cell.setBrush(QBrush(cell.bg_color))
+                cell.update()
         self.info_label.setText("数据已清空，等待电驱板返回...")
         self.info_label.setStyleSheet("color: #888;")
         self.hover_label.setText("")
