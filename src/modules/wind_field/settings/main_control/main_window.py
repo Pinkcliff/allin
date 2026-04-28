@@ -26,12 +26,13 @@ from .floating_windows import (
 from .enhanced_function_tool import EnhancedFunctionToolWindow
 from .function_3d_view import Function3DView
 from .data_analyzer_window import FeedbackPanel
+from .rpm_feedback_widget import RPMFeedbackWindow
 from .udp_fan_sender import FanUDPSender, AsyncFanUDPSender, FanUDPListener
 
 
 class _UDPListenerBridge(QObject):
     """线程安全的信号桥接：监听线程 -> UI线程"""
-    data_received = Signal(bytes)
+    data_received = Signal(bytes, str)  # data, source_ip
 
 
 class MainWindow(QMainWindow):
@@ -126,6 +127,9 @@ class MainWindow(QMainWindow):
 
         # 电驱板数据分析工具
         self.data_analyzer_window = None  # 已改为Dock内嵌面板，在_create_docks中初始化
+
+        # 转速反馈窗口
+        self.rpm_feedback_window = RPMFeedbackWindow(self)
 
         # 设置初始值
         self.fan_settings_window.set_max_rpm(self.max_rpm)
@@ -378,6 +382,7 @@ class MainWindow(QMainWindow):
         self.tool_circle_action = QAction(QIcon(os.path.join(icon_path, "圆形工具.png")), "圆形", self)
         self.tool_line_action = QAction(QIcon(os.path.join(icon_path, "直线工具.png")), "直线", self)
         self.tool_func_action = QAction(QIcon(os.path.join(icon_path, "fx.png")), "函数", self)
+        self.tool_rpm_action = QAction(QIcon(os.path.join(icon_path, "风扇设置.png")), "转速反馈", self)
         self.tool_fan_action = QAction(QIcon(os.path.join(icon_path, "风扇设置.png")), "风机", self)
         self.tool_time_action = QAction(QIcon(os.path.join(icon_path, "时间设置.png")), "时间", self)
         self.tool_template_action = QAction(QIcon(os.path.join(icon_path, "模板库.png")), "模板", self)
@@ -396,6 +401,7 @@ class MainWindow(QMainWindow):
         toolbar.addAction(self.tool_circle_action)
         toolbar.addAction(self.tool_line_action)
         toolbar.addAction(self.tool_func_action)
+        toolbar.addAction(self.tool_rpm_action)
         toolbar.addSeparator()
         toolbar.addAction(self.tool_fan_action)
         toolbar.addAction(self.tool_time_action)
@@ -503,13 +509,15 @@ class MainWindow(QMainWindow):
 
     def _on_udp_raw_data(self, data: bytes, addr: tuple):
         """UDP监听回调（在后台线程中调用）- 通过信号桥接到UI线程"""
-        self._listener_bridge.data_received.emit(data)
+        self._listener_bridge.data_received.emit(data, addr[0])
 
-    @Slot(bytes)
-    def _on_listener_data(self, data: bytes):
+    @Slot(bytes, str)
+    def _on_listener_data(self, data: bytes, source_ip: str):
         """UI线程中处理电驱板返回数据"""
         if hasattr(self, 'feedback_panel') and self.feedback_panel:
             self.feedback_panel.display_raw_data(data)
+        if hasattr(self, 'rpm_feedback_window') and self.rpm_feedback_window:
+            self.rpm_feedback_window.update_from_feedback(data, source_ip)
 
     def toggle_udp_listener(self, enabled: bool):
         """切换UDP监听器状态"""
@@ -692,6 +700,7 @@ class MainWindow(QMainWindow):
         self.tool_line_action.triggered.connect(self._show_line_tool)
         self.menu_function_generator_action.triggered.connect(self._show_function_tool)
         self.tool_func_action.triggered.connect(self._show_function_tool)
+        self.tool_rpm_action.triggered.connect(self._show_rpm_feedback)
         self.menu_run_sim_action.triggered.connect(self.launch_cfd_interface)
         self.tool_sim_action.triggered.connect(self.launch_cfd_interface)
         
@@ -773,6 +782,13 @@ class MainWindow(QMainWindow):
         self.tool_mode_group.setTitle("函数模式")
         self.canvas_widget.update_brush_preview()
         self._add_info_message("切换到 [函数模式]")
+
+    @Slot()
+    def _show_rpm_feedback(self):
+        """打开转速反馈窗口"""
+        self.rpm_feedback_window.show()
+        self.rpm_feedback_window.raise_()
+        self._add_info_message("已打开转速反馈窗口")
 
     @Slot()
     def _show_fan_settings(self):
@@ -1067,7 +1083,6 @@ class MainWindow(QMainWindow):
             # 更新画布
             self.canvas_widget.grid_data = result_grid
             self.canvas_widget.update_all_cells_from_data()
-            self.canvas_widget.update()
 
             # 返回结果网格供3D视图使用
             return result_grid

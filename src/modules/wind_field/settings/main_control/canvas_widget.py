@@ -518,11 +518,13 @@ class CanvasWidget(QGraphicsView):
         return self.grid_data
     
     def update_all_cells_from_data(self):
-        """从grid_data更新所有单元格的显示"""
+        """从grid_data更新所有单元格的显示（批量更新优化）"""
+        self.setUpdatesEnabled(False)
         for r in range(config.GRID_DIM):
             for c in range(config.GRID_DIM):
                 cell = self.cells[r][c]
                 cell.set_value(self.grid_data[r, c])
+        self.setUpdatesEnabled(True)
         self.update()
 
     @Slot()
