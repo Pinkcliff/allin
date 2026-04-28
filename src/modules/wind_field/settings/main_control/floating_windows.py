@@ -16,6 +16,7 @@ class SelectionInfoWindow(QDialog):
     apply_speed_signal = Signal(float)
     invert_selection_signal = Signal()
     reset_selection_signal = Signal()
+    set_all_speed_signal = Signal(float)
     
 # floating_windows.py -> SelectionInfoWindow
     def __init__(self, parent=None):
@@ -51,23 +52,30 @@ class SelectionInfoWindow(QDialog):
         self.select_all_button = QPushButton("全选")
         self.invert_selection_button = QPushButton("反选")
         # 2. 修改按钮文本
-        self.reset_button = QPushButton("全部清零") 
-        
+        self.reset_button = QPushButton("全部清零")
+        # 3. 新增：全部统一转速按钮
+        self.set_all_speed_button = QPushButton("全部统一转速")
+        self.set_all_speed_button.setStyleSheet("QPushButton { background-color: #4CAF50; color: white; font-weight: bold; padding: 4px; }")
+        self.set_all_speed_button.setFocusPolicy(Qt.NoFocus)
+
         self.select_all_button.setFocusPolicy(Qt.NoFocus)
         self.invert_selection_button.setFocusPolicy(Qt.NoFocus)
         self.reset_button.setFocusPolicy(Qt.NoFocus)
-        
+
         button_layout.addWidget(self.select_all_button)
         button_layout.addWidget(self.invert_selection_button)
         button_layout.addWidget(self.reset_button)
-        
+
         layout.addLayout(form_layout)
         layout.addLayout(button_layout)
+        layout.addWidget(self.set_all_speed_button)
         
         # 3. 连接信号
         self.speed_input.returnPressed.connect(self.apply_speed_to_selection)
         self.invert_selection_button.clicked.connect(self.invert_selection_signal.emit)
         # 注意：reset_button 的信号将在主窗口中连接到一个新的槽函数
+        # 【新增】全部统一转速按钮信号
+        self.set_all_speed_button.clicked.connect(self._on_set_all_speed)
         # 【新增】连接checkbox和spinbox
         self.feather_checkbox.toggled.connect(self.feather_spinbox.setEnabled)
     # 【新增】两个获取羽化设置的方法
@@ -97,6 +105,15 @@ class SelectionInfoWindow(QDialog):
             speed = float(self.speed_input.text())
             if 0 <= speed <= 100:
                 self.apply_speed_signal.emit(speed)
+        except ValueError:
+            pass
+
+    def _on_set_all_speed(self):
+        """将输入框中的转速应用到全部1600个风扇"""
+        try:
+            speed = float(self.speed_input.text())
+            if 0 <= speed <= 100:
+                self.set_all_speed_signal.emit(speed)
         except ValueError:
             pass
     

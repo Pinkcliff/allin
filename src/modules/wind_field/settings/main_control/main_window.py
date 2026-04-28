@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Slot, QTimer
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtGui import QUndoStack
+from PySide6.QtCore import QObject, Signal, QSize
 from .commands import EditCommand
 import numpy as np
 
@@ -24,7 +25,14 @@ from .floating_windows import (
 )
 from .enhanced_function_tool import EnhancedFunctionToolWindow
 from .function_3d_view import Function3DView
-from .udp_fan_sender import FanUDPSender, AsyncFanUDPSender 
+from .data_analyzer_window import FeedbackPanel
+from .udp_fan_sender import FanUDPSender, AsyncFanUDPSender, FanUDPListener
+
+
+class _UDPListenerBridge(QObject):
+    """线程安全的信号桥接：监听线程 -> UI线程"""
+    data_received = Signal(bytes)
+
 
 class MainWindow(QMainWindow):
     """重新设计的主窗口，包含右侧Dock面板和工具模式切换"""
@@ -49,6 +57,8 @@ class MainWindow(QMainWindow):
 
         # 【新增】UDP发送器初始化
         self.udp_sender = None
+        self.udp_listener = None
+        self._listener_bridge = _UDPListenerBridge()
         self.udp_enabled = True  # 【修改】默认启用UDP
         self.udp_async_mode = True  # 默认使用异步模式
         self.udp_send_on_change = True  # 【修改】数据变化时自动发送默认开启
@@ -82,6 +92,9 @@ class MainWindow(QMainWindow):
         # 【新增】初始化UDP发送器
         self._init_udp_sender()
 
+        # 【新增】初始化UDP返回数据监听器
+        self._init_udp_listener()
+
         # 【新增】初始化Web同步客户端（必须在UI创建后调用）
         self._init_web_sync()
 
@@ -110,6 +123,9 @@ class MainWindow(QMainWindow):
 
         # 3D函数视图
         self.function_3d_view = Function3DView(self)
+
+        # 电驱板数据分析工具
+        self.data_analyzer_window = None  # 已改为Dock内嵌面板，在_create_docks中初始化
 
         # 设置初始值
         self.fan_settings_window.set_max_rpm(self.max_rpm)
@@ -170,9 +186,13 @@ class MainWindow(QMainWindow):
         tool_mode_layout.addWidget(self.tool_stack)
         self.tool_mode_group.setLayout(tool_mode_layout)
 
-        # 2. 状态信息面板
+        # 2. 反馈信息面板（电驱板返回数据解析）
+        self.feedback_panel = FeedbackPanel(self)
+
+        # 3. 状态信息面板
         status_group = QGroupBox("状态信息")
         status_layout = QFormLayout()
+        status_layout.setLabelAlignment(Qt.AlignRight)
         self.fan_id_label = QLabel("--")
         self.fan_position_label = QLabel("--")
         self.fan_speed1_label = QLabel("--")
@@ -180,6 +200,12 @@ class MainWindow(QMainWindow):
         self.fan_pwm_label = QLabel("--")
         self.fan_power_label = QLabel("--")
         self.fan_runtime_label = QLabel("--")
+        # 为值标签设置最小宽度，防止文字被截断
+        min_w = 160
+        for lbl in [self.fan_id_label, self.fan_position_label, self.fan_speed1_label,
+                     self.fan_speed2_label, self.fan_pwm_label, self.fan_power_label,
+                     self.fan_runtime_label]:
+            lbl.setMinimumWidth(min_w)
         status_layout.addRow("风扇ID:", self.fan_id_label)
         status_layout.addRow("位置(行,列):", self.fan_position_label)
         status_layout.addRow("一级转速:", self.fan_speed1_label)
@@ -189,7 +215,7 @@ class MainWindow(QMainWindow):
         status_layout.addRow("运行时间:", self.fan_runtime_label)
         status_group.setLayout(status_layout)
 
-        # 3. 系统信息面板（限制高度）
+        # 4. 系统信息面板（限制高度）
         info_group = QGroupBox("系统信息")
         info_group.setMaximumHeight(200)  # 限制最大高度
         info_layout = QVBoxLayout()
@@ -199,15 +225,17 @@ class MainWindow(QMainWindow):
         info_layout.addWidget(self.info_output)
         info_group.setLayout(info_layout)
 
-        # 将三个部分添加到Dock容器中（移除嵌入式3D视图）
+        # 将四个部分添加到Dock容器中
         dock_layout.addWidget(self.tool_mode_group, 12)
+        dock_layout.addWidget(self.feedback_panel, 10)
         dock_layout.addWidget(status_group, 8)
         dock_layout.addWidget(info_group, 5)
 
         # 设置stretch因子
         dock_layout.setStretch(0, 12)
-        dock_layout.setStretch(1, 8)
-        dock_layout.setStretch(2, 5)
+        dock_layout.setStretch(1, 10)
+        dock_layout.setStretch(2, 8)
+        dock_layout.setStretch(3, 5)
 
         right_dock.setWidget(dock_container)
         self.addDockWidget(Qt.RightDockWidgetArea, right_dock)
@@ -250,6 +278,9 @@ class MainWindow(QMainWindow):
         self.menu_udp_send_all_action = QAction("立即发送所有数据", self)
         self.menu_udp_send_selected_action = QAction("发送选中数据", self)
         self.menu_udp_stats_action = QAction("UDP统计信息", self)
+        self.menu_udp_auto_parse_action = QAction("启用自动解析", self)
+        self.menu_udp_auto_parse_action.setCheckable(True)
+        self.menu_udp_auto_parse_action.setChecked(True)
 
         # 【新增】播放时自动发送UDP数据
         self.udp_send_on_play = True  # 默认开启播放时发送
@@ -297,6 +328,7 @@ class MainWindow(QMainWindow):
         udp_menu.addAction(self.menu_udp_send_selected_action)
         udp_menu.addSeparator()
         udp_menu.addAction(self.menu_udp_stats_action)
+        udp_menu.addAction(self.menu_udp_auto_parse_action)
 
 
 # main_window.py -> MainWindow
@@ -313,6 +345,7 @@ class MainWindow(QMainWindow):
         toolbar = QToolBar("主工具栏")
         self.addToolBar(toolbar)
         toolbar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        toolbar.setIconSize(QSize(32, 32))
         
         current_dir = os.path.dirname(__file__)
         # 图标文件位于风场设置/icon目录下
@@ -456,6 +489,41 @@ class MainWindow(QMainWindow):
         else:
             self._add_info_message("UDP发送已禁用")
 
+    def _init_udp_listener(self):
+        """初始化UDP返回数据监听器"""
+        try:
+            self.udp_listener = FanUDPListener(
+                callback=self._on_udp_raw_data
+            )
+            self.udp_listener.start()
+            self._add_info_message("UDP返回数据监听已启动 (端口: 6001)")
+        except Exception as e:
+            self._add_info_message(f"UDP监听器初始化失败: {e}")
+            self.udp_listener = None
+
+    def _on_udp_raw_data(self, data: bytes, addr: tuple):
+        """UDP监听回调（在后台线程中调用）- 通过信号桥接到UI线程"""
+        self._listener_bridge.data_received.emit(data)
+
+    @Slot(bytes)
+    def _on_listener_data(self, data: bytes):
+        """UI线程中处理电驱板返回数据"""
+        if hasattr(self, 'feedback_panel') and self.feedback_panel:
+            self.feedback_panel.display_raw_data(data)
+
+    def toggle_udp_listener(self, enabled: bool):
+        """切换UDP监听器状态"""
+        if enabled:
+            if self.udp_listener is None:
+                self._init_udp_listener()
+            elif not self.udp_listener.running:
+                self.udp_listener.start()
+                self._add_info_message("UDP返回数据监听已启动")
+        else:
+            if self.udp_listener:
+                self.udp_listener.stop()
+                self._add_info_message("UDP返回数据监听已停止")
+
     def _init_web_sync(self):
         """初始化Web同步客户端"""
         try:
@@ -552,6 +620,9 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """窗口关闭事件处理"""
+        # 关闭UDP监听器
+        if self.udp_listener:
+            self.udp_listener.stop()
         # 关闭UDP发送器
         if self.udp_sender:
             if isinstance(self.udp_sender, AsyncFanUDPSender):
@@ -577,6 +648,7 @@ class MainWindow(QMainWindow):
         self.selection_widget.invert_selection_signal.connect(self.canvas_widget.invert_selection)
         self.selection_widget.reset_button.clicked.connect(self._reset_all_fans_to_zero)
         self.selection_widget.select_all_button.clicked.connect(self.canvas_widget.select_all_cells)
+        self.selection_widget.set_all_speed_signal.connect(self._set_all_fans_to_speed)
 
         # 【新增】圆形工具信号
         self.circle_widget.apply_speed_signal.connect(self._apply_speed_to_selected_fans)
@@ -639,6 +711,10 @@ class MainWindow(QMainWindow):
         self.menu_udp_send_all_action.triggered.connect(self.send_all_fans_udp)
         self.menu_udp_send_selected_action.triggered.connect(self.send_selected_fans_udp)
         self.menu_udp_stats_action.triggered.connect(self.print_udp_statistics)
+        self.menu_udp_auto_parse_action.toggled.connect(self.toggle_udp_listener)
+
+        # 【新增】UDP监听器信号连接
+        self._listener_bridge.data_received.connect(self._on_listener_data)
 
         # 笔刷widget参数变化信号
         self.brush_widget.brush_size_spinbox.valueChanged.connect(self.canvas_widget.update_brush_preview)
@@ -1223,6 +1299,22 @@ class MainWindow(QMainWindow):
         # 不在这里重复调用，避免 3200 次格子更新导致卡顿
         self._push_edit_command("全部清零")
         self._add_info_message("所有风扇转速已清零，选择已取消")
+
+        # 同步到Web端
+        self._sync_to_web()
+
+        # 如果启用了UDP自动发送，则发送数据
+        if self.udp_send_on_change:
+            self._send_pwm_data_via_udp(selected_only=False)
+
+    @Slot(float)
+    def _set_all_fans_to_speed(self, speed: float):
+        """槽函数：将全部1600个风扇(100个模组)统一设置为同一转速 (支持撤销)"""
+        self.data_before_edit = np.copy(self.canvas_widget.grid_data)
+        self.canvas_widget.grid_data.fill(speed)
+        self.canvas_widget.selected_cells.clear()
+        self._push_edit_command(f"全部统一转速: {speed}%")
+        self._add_info_message(f"已将全部1600个风扇转速统一设置为 {speed}%")
 
         # 同步到Web端
         self._sync_to_web()

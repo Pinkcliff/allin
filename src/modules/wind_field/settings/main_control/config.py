@@ -45,7 +45,7 @@ SELECTION_BORDER_COLOR: QColor = QColor(0, 120, 215, 220)
 SELECTION_BORDER_WIDTH: int = 2
 
 # --- Text Rendering ---
-CELL_FONT: QFont = QFont("Arial", 6)
+CELL_FONT: QFont = QFont("Microsoft YaHei", 7)
 LUMINANCE_THRESHOLD = 140
 
 # --- Other Constants ---

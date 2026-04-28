@@ -495,27 +495,24 @@ try:
     check("链路9 IP=192.168.1.109", sender._get_chain_ip(9) == "192.168.1.109")
 
     # 测试9.3: 全局板ID到IP映射
+    # 新映射: global_board_id = board_in_chain * 10 + chain_id, chain_id = board_id % 10
     log("\n--- 测试9.3: 全局板ID到IP映射 ---")
-    check("板0(IP=链路0)=192.168.1.100", sender._get_board_ip(0) == "192.168.1.100")
-    check("板15(IP=链路1)=192.168.1.101", sender._get_board_ip(15) == "192.168.1.101")
-    check("板99(IP=链路9)=192.168.1.109", sender._get_board_ip(99) == "192.168.1.109")
+    check("板0(board=0,chain=0,IP=链路0)=192.168.1.100", sender._get_board_ip(0) == "192.168.1.100")
+    check("板51(board=5,chain=1,IP=链路1)=192.168.1.101", sender._get_board_ip(51) == "192.168.1.101")
+    check("板99(board=9,chain=9,IP=链路9)=192.168.1.109", sender._get_board_ip(99) == "192.168.1.109")
 
     # 测试9.4: 40x40网格到100板映射
     log("\n--- 测试9.4: 40x40网格到100板映射 ---")
-    # 板ID = chain*10 + board_in_chain
-    # 全局板ID = row_group*10 + col_group, row_group = row//4, col_group = col//4
-    # 但实际在send_grid_to_boards_bulk中是:
-    # global_board_id = chain_id * 10 + board_in_chain
-    # row_start = global_board_id // 10 * 4
-    # col_start = (global_board_id % 10) * 4
+    # 映射: chain_id → IP, board_in_chain = 9 - row_group(行反转)
+    # global_board_id = board_in_chain * 10 + chain_id
+    # row_start = (9 - board_in_chain) * 4, col_start = (9 - chain_id) * 4 (左右反转)
 
     # 验证映射覆盖所有40x40格子
     covered = set()
     for chain_id in range(10):
         for board_in_chain in range(10):
-            global_id = chain_id * 10 + board_in_chain
-            row_start = global_id // 10 * 4
-            col_start = (global_id % 10) * 4
+            row_start = (9 - board_in_chain) * 4
+            col_start = (9 - chain_id) * 4
             for r in range(row_start, row_start + 4):
                 for c in range(col_start, col_start + 4):
                     covered.add((r, c))

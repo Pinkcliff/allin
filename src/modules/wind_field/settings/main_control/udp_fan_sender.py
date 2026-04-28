@@ -21,11 +21,13 @@ UDP风扇控制模块 - 651字节协议版本
 PWM范围: 0-1000, 100% = 1000
 发送粒度: 每个链路(10块板)一包, 共10个链路 = 10包
 
-IP映射: 每行10个板共享1个IP
-  链路0 (板0-9)   -> 192.168.1.100
-  链路1 (板10-19) -> 192.168.1.101
+IP映射: 每列10个板共享1个IP（列=链路）
+  链路0 (网格最右列) -> 192.168.1.100
+  链路1 (第2右列)    -> 192.168.1.101
   ...
-  链路9 (板90-99) -> 192.168.1.109
+  链路9 (网格最左列) -> 192.168.1.109
+  网格列映射: col_start = (9 - chain_id) * 4 (左右反转)
+  每列内: 底部=板ID 0, 顶部=板ID 9
 """
 
 import socket
@@ -44,8 +46,8 @@ import threading as threading_module
 PROTOCOL_CONFIG = {
     'controller_ip': '192.168.1.101',   # 中控机以太网口IP
     'local_bind_ip': '192.168.1.101',   # 绑定本地网口IP
-    'board_ip_start': '192.168.1.100',  # 第1行(链路0) -> 192.168.1.100
-    'board_ip_end': '192.168.1.109',    # 第10行(链路9) -> 192.168.1.109
+    'board_ip_start': '192.168.1.100',  # 链路0 -> 192.168.1.100 (网格最右列)
+    'board_ip_end': '192.168.1.109',    # 链路9 -> 192.168.1.109 (网格最左列)
     'udp_port': 6005,
     'fans_per_board': 16,
     'boards_per_chain': 10,  # 每个链路10个板
@@ -53,6 +55,7 @@ PROTOCOL_CONFIG = {
     'pwm_max': 1000,          # 100% = 1000
     'packet_size': 651,       # 651字节完整包
     'bytes_per_board': 64,    # 每块板在数据区占64字节
+    'listen_port': 6001,      # 电驱板返回数据监听端口
 }
 
 
@@ -198,7 +201,7 @@ class FanUDPSender:
             self.logger.info('FanUDPSender 初始化完成 (协议: 651字节 AA...CC)')
             self.logger.info(f'PWM满值: {PROTOCOL_CONFIG["pwm_max"]} (100%=1000)')
             self.logger.info(f'发送粒度: 每链路1包(10板), 共10包')
-            self.logger.info(f'IP范围: 192.168.1.100-109')
+            self.logger.info(f'IP范围: 192.168.1.100-109 (列映射: 左=.109, 右=.100)')
             self.logger.info('=' * 60)
 
     def _get_chain_ip(self, chain_id: int) -> str:
@@ -216,8 +219,10 @@ class FanUDPSender:
         return f"192.168.1.{last_octet}"
 
     def _get_board_ip(self, board_id: int) -> str:
-        """根据全局板ID获取IP (兼容旧接口)"""
-        return self._get_chain_ip(board_id // 10)
+        """根据全局板ID获取IP (兼容旧接口)
+        新映射: global_board_id = board_in_chain * 10 + chain_id, chain_id = board_id % 10
+        """
+        return self._get_chain_ip(board_id % 10)
 
     def _init_csv_file(self):
         """初始化CSV文件，写入表头"""
@@ -594,7 +599,7 @@ class FanUDPSender:
             self.stats['success_packets'] += 1
             self.stats['last_send_time'] = datetime.now()
 
-            global_board_id = chain_id * 10 + board_id
+            global_board_id = board_id * 10 + chain_id
             hex_str = ' '.join(f'{b:02X}' for b in packet)
             print(f"[UDP发送] 板ID:{global_board_id:2d} | IP:{target_ip}:{self.udp_port} | 链路:{chain_id} 板内:{board_id} | 风扇{fan_id} PWM:{pwm_value}")
             print(f"[UDP数据] {hex_str}")
@@ -635,10 +640,10 @@ class FanUDPSender:
 
         for chain_id in range(10):
             for board_in_chain in range(10):
-                global_board_id = chain_id * 10 + board_in_chain
+                global_board_id = board_in_chain * 10 + chain_id
 
-                row_start = global_board_id // 10 * 4
-                col_start = (global_board_id % 10) * 4
+                row_start = (9 - board_in_chain) * 4
+                col_start = (9 - chain_id) * 4
                 module_data = grid_data[row_start:row_start + 4, col_start:col_start + 4]
 
                 for logical_fan_id in range(16):
@@ -688,24 +693,24 @@ class FanUDPSender:
         # 找出所有受影响的模块
         affected_boards = set()
         for cell in selected_cells:
-            global_board_id = cell.row // 4 * 10 + cell.col // 4
-            affected_boards.add(global_board_id)
+            chain_id = 9 - cell.col // 4        # 列组反转 → 链路/IP (左=109, 右=100)
+            board_in_chain = 9 - cell.row // 4  # 行组反转 → 板ID (底部=0, 顶部=9)
+            global_board_id = board_in_chain * 10 + chain_id
+            affected_boards.add((chain_id, board_in_chain, global_board_id))
 
         # 按链路分组
         chain_groups = {}
-        for global_board_id in affected_boards:
-            chain_id = global_board_id // 10
-            board_in_chain = global_board_id % 10
+        for chain_id, board_in_chain, global_board_id in affected_boards:
             if chain_id not in chain_groups:
                 chain_groups[chain_id] = {}
             chain_groups[chain_id][board_in_chain] = global_board_id
 
-        # 每个链路构建一包
+        # 每个链路构建一包（包含全部10块板，未选中的板保持当前值）
         for chain_id, boards in chain_groups.items():
             boards_pwm_data = {}
-            for board_in_chain, global_board_id in boards.items():
-                row_start = global_board_id // 10 * 4
-                col_start = (global_board_id % 10) * 4
+            for board_in_chain in range(10):
+                row_start = (9 - board_in_chain) * 4
+                col_start = (9 - chain_id) * 4
                 module_data = grid_data[row_start:row_start + 4, col_start:col_start + 4]
 
                 pwm_values = []
@@ -798,9 +803,9 @@ class FanUDPSender:
                 boards_pwm_data = {}
 
                 for board_in_chain in range(10):
-                    global_board_id = chain_id * 10 + board_in_chain
-                    row_start = global_board_id // 10 * 4
-                    col_start = (global_board_id % 10) * 4
+                    global_board_id = board_in_chain * 10 + chain_id
+                    row_start = (9 - board_in_chain) * 4
+                    col_start = (9 - chain_id) * 4
                     module_data = grid_data[row_start:row_start + 4, col_start:col_start + 4]
 
                     pwm_values = []
@@ -824,8 +829,8 @@ class FanUDPSender:
                     for bid in range(10):
                         pwm_vals = boards_pwm_data.get(bid, [])
                         if any(v > 0 for v in pwm_vals):
-                            row_s = (chain_id * 10 + bid) // 10 * 4
-                            col_s = bid * 4
+                            row_s = (9 - bid) * 4
+                            col_s = (9 - chain_id) * 4
                             self._verify_log(f"  板{bid} (网格[{row_s}:{row_s+4},{col_s}:{col_s+4}]): PWM={pwm_vals}")
 
                 if not packet or len(packet) != 651:
@@ -1056,6 +1061,86 @@ class AsyncFanUDPSender(FanUDPSender):
                 'grid_data': grid_data.copy(),
                 'callback': callback
             })
+
+
+class FanUDPListener:
+    """UDP返回数据监听器 - 自动接收电驱板返回数据
+
+    监听电驱板返回的BB帧:
+      [0]       BB           帧头
+      [1-4]     计数器       4字节小端序
+      [5]       类型         0x05=状态上报, 0x06=查询反馈
+      [6-7]     数据长度     大端序
+      [8..N-2]  数据区
+      [N-2,N-1] CC CC        帧尾
+    """
+
+    def __init__(self, listen_port: int = None, callback=None, enable_logging: bool = True):
+        self.listen_port = listen_port or PROTOCOL_CONFIG['listen_port']
+        self.callback = callback
+        self.enable_logging = enable_logging
+        self.logger = get_udp_logger() if enable_logging else None
+        self.listener_sock = None
+        self.running = False
+        self._thread = None
+
+    def start(self):
+        if self.running:
+            return
+        self.running = True
+        self._thread = threading.Thread(target=self._listen_loop, daemon=True)
+        self._thread.start()
+        if self.logger:
+            self.logger.info(f'UDP返回数据监听已启动, 端口: {self.listen_port}')
+
+    def stop(self):
+        self.running = False
+        if self.listener_sock:
+            try:
+                self.listener_sock.close()
+            except Exception:
+                pass
+            self.listener_sock = None
+        if self._thread:
+            self._thread.join(timeout=2)
+        if self.logger:
+            self.logger.info('UDP返回数据监听已停止')
+
+    def _listen_loop(self):
+        try:
+            self.listener_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.listener_sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 65536)
+            self.listener_sock.settimeout(1.0)
+            self.listener_sock.bind(('0.0.0.0', self.listen_port))
+            if self.logger:
+                self.logger.info(f'UDP监听绑定成功: 0.0.0.0:{self.listen_port}')
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f'UDP监听绑定失败: {e}')
+            self.running = False
+            return
+
+        while self.running:
+            try:
+                data, addr = self.listener_sock.recvfrom(4096)
+                if self.callback and len(data) >= 8:
+                    self.callback(data, addr)
+            except socket.timeout:
+                continue
+            except OSError:
+                break
+            except Exception as e:
+                if self.logger:
+                    self.logger.warning(f'UDP监听接收异常: {e}')
+                continue
+
+        if self.listener_sock:
+            try:
+                self.listener_sock.close()
+            except Exception:
+                pass
+            self.listener_sock = None
+        self.running = False
 
 
 # 便捷函数

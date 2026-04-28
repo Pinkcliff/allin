@@ -306,11 +306,13 @@ class GlobalDashboardWindow(QMainWindow):
 
             # 根据按钮文字长度设置按钮大小
             if name == "俯仰·造雨·示踪":
-                button.setFixedSize(115, 30)  # 为长文字按钮设置更大的宽度
+                button.setFixedSize(130, 30)  # 为长文字按钮设置更大的宽度
             elif name == "传感器数据":
-                button.setFixedSize(80, 30)  # 传感器数据按钮稍宽
+                button.setFixedSize(90, 30)  # 传感器数据按钮稍宽
+            elif name == "PLC监控":
+                button.setFixedSize(80, 30)  # PLC监控按钮稍宽
             else:
-                button.setFixedSize(45, 30)
+                button.setFixedSize(60, 30)
 
             self.toolbar_buttons[name] = button
             self.toolbar.addWidget(button)
@@ -322,7 +324,7 @@ class GlobalDashboardWindow(QMainWindow):
         settings_button.setChecked(self.docks['设置'].isVisible())
         settings_button.toggled.connect(lambda checked: self.toggle_dynamic_dock('设置', checked))
         self.docks['设置'].visibilityChanged.connect(settings_button.setChecked)
-        settings_button.setFixedSize(45, 30)
+        settings_button.setFixedSize(60, 30)
         self.toolbar.addWidget(settings_button)
         
         self.theme_switch = ThemeSwitch()

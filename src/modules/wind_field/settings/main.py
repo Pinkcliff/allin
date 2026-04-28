@@ -17,13 +17,25 @@ import PySide6
 qt_plugins_path = os.path.join(os.path.dirname(PySide6.__file__), 'plugins')
 os.environ['QT_PLUGIN_PATH'] = qt_plugins_path
 
+# 启用高 DPI 支持（必须在 QApplication 创建之前设置）
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QFont
 from main_control.main_window import MainWindow
+
+# 高 DPI 缩放：使用系统 DPI 设置，字体清晰
+QApplication.setHighDpiScaleFactorRoundingPolicy(
+    Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+)
 
 def main():
     """主函数"""
     app = QApplication(sys.argv)
     app.setApplicationName("风场设置")
+
+    # 设置全局默认字体（微软雅黑 10pt，清晰易读）
+    default_font = QFont("Microsoft YaHei", 10)
+    app.setFont(default_font)
 
     window = MainWindow()
     window.show()

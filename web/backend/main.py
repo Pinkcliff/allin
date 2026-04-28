@@ -23,6 +23,7 @@ if SRC_DIR not in sys.path:
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 import logging
 
@@ -77,9 +78,9 @@ app.include_router(sensor.router, prefix="/api/sensor", tags=["传感器"])
 app.include_router(sync.router, prefix="/api", tags=["同步"])
 
 
-@app.get("/")
+@app.get("/api/info")
 async def root():
-    """根路径"""
+    """API信息"""
     return {
         "name": "Web Digital Twin API",
         "version": "1.0.0",
@@ -111,14 +112,41 @@ async def websocket_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
+    import sys
 
-    logger.info(f"启动服务器: http://{settings.HOST}:{settings.PORT}")
-    logger.info(f"API文档: http://{settings.HOST}:{settings.PORT}/docs")
+    # PyInstaller 打包后不能使用 reload（会无限重启）
+    is_frozen = getattr(sys, 'frozen', False)
+
+    # 打包模式下使用 localhost 避免端口冲突，开发模式保持原配置
+    bind_host = "127.0.0.1" if is_frozen else settings.HOST
+    bind_port = settings.PORT
+
+    logger.info(f"启动服务器: http://{bind_host}:{bind_port}")
+    logger.info(f"API文档: http://{bind_host}:{bind_port}/docs")
+    if is_frozen:
+        logger.info("打包模式运行，已禁用热重载")
 
     uvicorn.run(
         "web.backend.main:app",
-        host=settings.HOST,
-        port=settings.PORT,
-        reload=settings.DEBUG,
+        host=bind_host,
+        port=bind_port,
+        reload=settings.DEBUG and not is_frozen,
         log_level="info"
     )
+
+
+# ==================== 前端静态文件服务 ====================
+# 将构建好的Vue前端dist目录挂载为静态文件
+_FRONTEND_DIST = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'dist')
+if os.path.isdir(_FRONTEND_DIST):
+    # 挂载静态资源目录 (JS/CSS/图片等)
+    app.mount("/assets", StaticFiles(directory=os.path.join(_FRONTEND_DIST, "assets")), name="static_assets")
+
+    # 所有未匹配的路径返回 index.html (Vue Router history模式)
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        """Vue前端路由 - 所有未匹配路径返回index.html"""
+        file_path = os.path.join(_FRONTEND_DIST, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(_FRONTEND_DIST, "index.html"))
